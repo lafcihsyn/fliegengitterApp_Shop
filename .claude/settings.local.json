@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/craft/Documents/bella_shop/)",
+      "Read(//Users/craft/Documents/bella_shop/**)",
+      "Bash(firebase --version)",
+      "Bash(firebase projects:list)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(firebase login:list)",
+      "Bash(firebase firestore:databases:list)",
+      "Bash(firebase hosting:sites:list)",
+      "Bash(firebase hosting:channel:list --site fliegengitter-3486c)",
+      "Bash(firebase hosting:channel:list --site fliegengitter-bestellung)",
+      "Bash(ls -la /Users/craft/Documents/ 2>&1 | grep -i fliegen)",
+      "Read(//Users/craft/Documents/**)",
+      "Bash(firebase hosting:channel:deploy test --only shop)",
+      "Bash(firebase deploy *)",
+      "Bash(curl -s -X POST https://fliegengitter-bestellung.web.app/api/orders/lookup -H 'Content-Type: application/json' -d '{\"orderNumber\":\"#2026-00369\",\"email\":\"h.lafci@gmx.net\"}')",
+      "Bash(curl -sv -X POST https://fliegengitter-bestellung.web.app/api/orders/lookup -H 'Content-Type: application/json' -d '{\"orderNumber\":\"#2026-00369\",\"email\":\"h.lafci@gmx.net\"}')",
+      "Bash(curl -s -o /tmp/health.json -w \"STATUS: %{http_code}\\\\n\" https://fliegengitter-bestellung.web.app/api/health)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s -o /tmp/lookup.json -w \"STATUS: %{http_code}\\\\n\" -X POST 'https://fliegengitter-bestellung.web.app/api/orders/lookup' -H 'Content-Type: application/json' -d '{\"orderNumber\":\"#2026-00369\",\"email\":\"h.lafci@gmx.net\"}')",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /tmp/track.json -w \"STATUS: %{http_code}\\\\n\" 'https://fliegengitter-bestellung.web.app/api/orders/track/1cf3a4d485e0f6caf02fa08aa66b09f1')",
+      "Bash(curl -s 'https://fliegengitter-bestellung.web.app/api/colors' -o /tmp/colors.json -w \"STATUS: %{http_code}\\\\n\")",
+      "Bash(firebase hosting:sites:create bestellung-fliegengitterwien --project fliegengitter-3486c)",
+      "Bash(firebase target:clear hosting shop --project fliegengitter-3486c)",
+      "Bash(firebase target:apply hosting shop bestellung-fliegengitterwien --project fliegengitter-3486c)"
+    ]
+  }
+}

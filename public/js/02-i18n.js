@@ -1,0 +1,763 @@
+// ═══════════════════════════════════════════════════════════════════
+// 02-i18n.js — Sprachsystem (Deutsch / Türkisch)
+// 
+// Stellt bereit:
+//   - TRANSLATIONS_TR (Wörterbuch DE → TR, ~700 Einträge)
+//   - currentLanguage (globale Variable)
+//   - loadLanguagePreference() — liest aus localStorage
+//   - setLanguage(lang) — wechselt Sprache, speichert in Firestore, reloadet
+//   - t(de) — direkter Lookup für JS-Code
+//   - applyTranslationsToElement(root) — DOM-Übersetzung
+//   - startI18nObserver() — beobachtet DOM-Änderungen
+//
+// WICHTIG: Diese Datei MUSS nach 01-helpers.js geladen werden 
+// (showToast nutzt TRANSLATIONS_TR defensiv) und VOR allen Render-
+// und Daten-Funktionen, die später setLanguage / t() / Observer brauchen.
+// ═══════════════════════════════════════════════════════════════════
+
+const TRANSLATIONS_TR = {
+  '(bei neuer Bestellung vorausgewählt – nur eines)': '(yeni siparişte önceden seçili – yalnızca biri)',
+  '(durch Modell vorgegeben)': '(model tarafından belirlenir)',
+  '+ Cut': '+ Kesim',
+  '+ Material hinzufügen': '+ Malzeme ekle',
+  '+ Maß hinzufügen': '+ Ölçü ekle',
+  '+ Neue Farbe': '+ Yeni renk',
+  '+ Neue Filiale': '+ Yeni şube',
+  '+ Neue Plissee-Farbe': '+ Yeni plise rengi',
+  '+ Neue Variante': '+ Yeni varyant',
+  '+ Neuer Entwurf': '+ Yeni taslak',
+  '+ Neues Material': '+ Yeni malzeme',
+  '+ Neues Modell': '+ Yeni model',
+  '+ Option hinzufügen': '+ Seçenek ekle',
+  '+ Override': '+ Geçersiz kılma',
+  '+ Schnittmaß hinzufügen': '+ Kesim ölçüsü ekle',
+  '0 = Bezahlung erst bei Abholung': '0 = Ödeme yalnızca teslim alımda',
+  '0 = keine Warnung': '0 = uyarı yok',
+  'Abbrechen': 'İptal',
+  'Abmelden': 'Çıkış Yap',
+  'Abstand-Berechnung': 'Aralık hesaplama',
+  'Abzug': 'Pay (Düşüm)',
+  'Abzug cm': 'Pay cm',
+  'Abzug in cm': 'Pay (cm)',
+  'Abzug überschreiben (leer = wie Standard)': 'Payı geçersiz kıl (boş = standart gibi)',
+  'Admin': 'Yönetici',
+  'Admins haben automatisch alle Berechtigungen.': 'Yöneticiler otomatik olarak tüm yetkilere sahiptir.',
+  'Adresse (Straße, PLZ, Ort)': 'Adres (Sokak, Posta kodu, Şehir)',
+  'Adresse (optional)': 'Adres (isteğe bağlı)',
+  'Aktiv': 'Aktif',
+  'Aktiv (kann ausgewählt werden)': 'Aktif (seçilebilir)',
+  'Aktivieren': 'Etkinleştir',
+  'Aktivitäten': 'Aktiviteler',
+  'Aktueller Stand:': 'Mevcut durum:',
+  'Alle Bestellungen, Materialien und Einstellungen als JSON-Datei sichern.': 'Tüm siparişleri, malzemeleri ve ayarları JSON dosyası olarak yedekle.',
+  'Alle Bestände über Mindestbestand!': 'Tüm stoklar minimum stoğun üzerinde!',
+  'Alle Filialen': 'Tüm şubeler',
+  'Alle aktiven Materialien sind bereits in der Schnittliste.': 'Tüm aktif malzemeler zaten kesim listesinde.',
+  'Als Entwurf speichern': 'Taslak olarak kaydet',
+  'Anmelden': 'Giriş Yap',
+  'Anruf': 'Arama',
+  'Anrufen': 'Ara',
+  'Antrazit': 'Antrasit',
+  'Anzahl': 'Adet',
+  'Anzahl Rollen': 'Rulo sayısı',
+  'Anzahlung': 'Ön ödeme',
+  'Anzahlung (€) — optional': 'Ön ödeme (€) — isteğe bağlı',
+  'Anzahlung darf nicht höher sein als Reparatur-Preis.': 'Ön ödeme tamir fiyatından yüksek olamaz.',
+  'Anzahlung €': 'Ön ödeme €',
+  'Anzahlung:': 'Ön ödeme:',
+  'Artikel': 'Ürün',
+  'Artikel hinzufügen um Preis zu berechnen': 'Fiyatı hesaplamak için ürün ekle',
+  'Aus Materialien übernehmen': 'Malzemelerden al',
+  'Aus Schnittmaßen (Abzüge)': 'Kesim ölçülerinden (paylar)',
+  'Auswahlmöglichkeiten dieser Variante. ★ = Default.': 'Bu varyantın seçenekleri. ★ = Varsayılan.',
+  'Auswertung': 'Değerlendirme',
+  'B-Ware': 'B Ürün',
+  'B-Ware eingetragen!': 'B Ürün kaydedildi!',
+  'B-Ware eintragen': 'B Ürün kaydet',
+  'B-Ware gespeichert!': 'B Ürün kaydedildi!',
+  'B-Ware speichern': 'B Ürün kaydet',
+  'BREITE': 'GENİŞLİK',
+  'Backup empfohlen!': 'Yedekleme önerilir!',
+  'Backup empfohlen! Letztes Backup vor': 'Yedekleme önerilir! Son yedekten bu yana:',
+  'Backup erfolgreich wiederhergestellt! Seite wird neu geladen...': 'Yedekleme başarıyla geri yüklendi! Sayfa yeniden yükleniyor...',
+  'Backup wird erstellt...': 'Yedek oluşturuluyor...',
+  'Backup wird wiederhergestellt...': 'Yedek geri yükleniyor...',
+  'Backup-Fehler:': 'Yedekleme hatası:',
+  'Bankverbindung:': 'Banka bilgileri:',
+  'Basis': 'Temel',
+  'Bearbeiten': 'Düzenle',
+  'Bedingung:': 'Koşul:',
+  'Bei dieser Option Plissee-Farb-Auswahl abfragen': 'Bu seçenekte plise renk seçimini sor',
+  'Bei neuen Bestellungen benachrichtigen': 'Yeni siparişlerde bildirim gönder',
+  'Bemerkung': 'Not',
+  'Bemerkung (optional)': 'Not (isteğe bağlı)',
+  'Bemerkung zur Reparatur': 'Tamir notu',
+  'Bemerkung:': 'Not:',
+  'Benachrichtigt': 'Bildirildi',
+  'Benachrichtigungen': 'Bildirimler',
+  'Benachrichtigungen aktiviert!': 'Bildirimler etkinleştirildi!',
+  'Benachrichtigungen wurden abgelehnt.': 'Bildirimler reddedildi.',
+  'Benachrichtigungstext': 'Bildirim metni',
+  'Berechnete Werte:': 'Hesaplanan değerler:',
+  'Berechtigungen': 'Yetkiler',
+  'Berechtigungen gespeichert.': 'Yetkiler kaydedildi.',
+  'Berechtigungen speichern': 'Yetkileri kaydet',
+  'Bereits vollständig bezahlt.': 'Zaten tamamen ödendi.',
+  'Beschreibung': 'Açıklama',
+  'Best.': 'Sip.',
+  'Bestand': 'Stok',
+  'Bestand wird berechnet...': 'Stok hesaplanıyor...',
+  'Bestandsübersicht': 'Stok genel bakış',
+  'Bestell.': 'Sipariş',
+  'Bestelldatum': 'Sipariş tarihi',
+  'Bestelldatum Reparatur': 'Tamir sipariş tarihi',
+  'Bestellen ✓': 'Sipariş ver ✓',
+  'Bestellliste': 'Sipariş listesi',
+  'Bestellm.': 'Sip.M.',
+  'Bestellung bestätigen': 'Siparişi onayla',
+  'Bestellung endgültig gelöscht.': 'Sipariş kalıcı olarak silindi.',
+  'Bestellung gespeichert!': 'Sipariş kaydedildi!',
+  'Bestellung in Papierkorb verschoben.': 'Sipariş çöp kutusuna taşındı.',
+  'Bestellung nach Abholbereit verschoben!': 'Sipariş Teslime Hazır durumuna taşındı!',
+  'Bestellung nicht gefunden.': 'Sipariş bulunamadı.',
+  'Bestellung speichern': 'Siparişi kaydet',
+  'Bestellungen': 'Siparişler',
+  'Bestellungen ohne Filiale zuweisen:': 'Şubesiz siparişleri ata:',
+  'Bestellungen werden zugewiesen...': 'Siparişler atanıyor...',
+  'Bestellübersicht': 'Sipariş genel bakış',
+  'Betrag €': 'Tutar €',
+  'Bezahlt': 'Ödendi',
+  'Bezeichnung': 'Tanım',
+  'Bitte Anzahl eingeben.': 'Lütfen adet girin.',
+  'Bitte Anzahl und Falten eingeben.': 'Lütfen adet ve pile girin.',
+  'Bitte Anzahl und Länge eingeben.': 'Lütfen adet ve uzunluk girin.',
+  'Bitte Anzahl und Meter eingeben.': 'Lütfen adet ve metre girin.',
+  'Bitte Betrag eingeben.': 'Lütfen tutar girin.',
+  'Bitte E-Mail und Passwort eingeben.': 'Lütfen e-posta ve şifre girin.',
+  'Bitte Filiale wählen.': 'Lütfen şube seçin.',
+  'Bitte Material wählen.': 'Lütfen malzeme seçin.',
+  'Bitte Maß eingeben.': 'Lütfen ölçü girin.',
+  'Bitte Maße eingeben.': 'Lütfen ölçüleri girin.',
+  'Bitte Name eingeben (Vor- oder Nachname).': 'Lütfen ad girin (ad veya soyad).',
+  'Bitte Name eingeben.': 'Lütfen ad girin.',
+  'Bitte Telefonnummer eingeben.': 'Lütfen telefon numarası girin.',
+  'Bitte anmelden': 'Lütfen giriş yapın',
+  'Bitte ein Bild auswählen.': 'Lütfen bir resim seçin.',
+  'Bitte für Maß': 'Lütfen ölçü için',
+  'Bitte mindestens ein Maß eingeben.': 'Lütfen en az bir ölçü girin.',
+  'Bitte mindestens einen Ist-Bestand eingeben.': 'Lütfen en az bir mevcut stok girin.',
+  'Board-Spalten': 'Pano sütunları',
+  'Board-Spalten hinzufügen/entfernen': 'Pano sütunları ekle/kaldır',
+  'Braun': 'Kahverengi',
+  'Breite': 'Genişlik',
+  'Breite (cm)': 'Genişlik (cm)',
+  'CSV': 'CSV',
+  'DEFAULT': 'VARSAYILAN',
+  'DT-Faktor überschreiben': 'ÇK faktörünü geçersiz kıl',
+  'DT-Faktor:': 'ÇK faktörü:',
+  'DT×': 'ÇK×',
+  'DU': 'ÇK',
+  'Datensicherung': 'Veri yedekleme',
+  'Datum': 'Tarih',
+  'Default-Farbe:': 'Varsayılan renk:',
+  'Default-Modell': 'Varsayılan model',
+  'Default-Option': 'Varsayılan seçenek',
+  'Die App wurde aktualisiert.': 'Uygulama güncellendi.',
+  'Die Schnittmaße werden seit v1.12 direkt am jeweiligen Material gepflegt. Öffne dazu in der Material-Verwaltung das gewünschte Material und bearbeite die Liste der Schnittmaße.': 'Kesim ölçüleri v1.12 itibarıyla doğrudan ilgili malzeme üzerinde tutulur. Bunun için Malzeme Yönetimi içinde istediğiniz malzemeyi açıp kesim ölçüleri listesini düzenleyin.',
+  'Diese Bestellung wird unwiderruflich gelöscht. Tippe': 'Bu sipariş geri dönülemez şekilde silinecek. Yaz:',
+  'Diese Daten werden auf PDF-Bestellungen und Etiketten angezeigt.': 'Bu bilgiler PDF siparişlerinde ve etiketlerde gösterilir.',
+  'Diese Woche': 'Bu hafta',
+  'Diesen Monat': 'Bu ay',
+  'Dieser Auftrag wird von': 'Bu sipariş şu kişi tarafından işleniyor:',
+  'Dieser Browser unterstützt keine Benachrichtigungen.': 'Bu tarayıcı bildirimleri desteklemiyor.',
+  'Dieses Jahr': 'Bu yıl',
+  'Doppeltür': 'Çift kanat',
+  'Doppeltür €/m²': 'Çift kanat €/m²',
+  'Doppeltür-Faktor': 'Çift kanat faktörü',
+  'Drucken / Als PDF speichern': 'Yazdır / PDF olarak kaydet',
+  'Du bearbeitest bereits:': 'Zaten şunu işliyorsunuz:',
+  'E-Mail': 'E-posta',
+  'Ein Modell mit ähnlichem Namen existiert bereits.': 'Benzer adlı bir model zaten mevcut.',
+  'Eine Farbe mit ähnlichem Namen existiert bereits.': 'Benzer adlı bir renk zaten mevcut.',
+  'Eine Plissee-Farbe mit ähnlichem Namen existiert bereits.': 'Benzer adlı bir plise rengi zaten mevcut.',
+  'Eine Variante mit ähnlichem Namen existiert bereits.': 'Benzer adlı bir varyant zaten mevcut.',
+  'Einheit': 'Birim',
+  'Einkaufspreis € (optional)': 'Alış fiyatı € (isteğe bağlı)',
+  'Einstellungen': 'Ayarlar',
+  'Eintrag aktualisiert!': 'Kayıt güncellendi!',
+  'Eintrag gelöscht.': 'Kayıt silindi.',
+  'Eintrag nicht gefunden.': 'Kayıt bulunamadı.',
+  'Endgültig löschen': 'Kalıcı olarak sil',
+  'Entfernen': 'Kaldır',
+  'Entwurf aktualisieren': 'Taslağı güncelle',
+  'Entwurf aktualisiert.': 'Taslak güncellendi.',
+  'Entwurf geladen — du kannst ihn bearbeiten.': 'Taslak yüklendi — düzenleyebilirsiniz.',
+  'Entwurf gelöscht.': 'Taslak silindi.',
+  'Entwurf gespeichert:': 'Taslak kaydedildi:',
+  'Entwurf löschen': 'Taslağı sil',
+  'Entwurf nicht gefunden.': 'Taslak bulunamadı.',
+  'Entwürfe': 'Taslaklar',
+  'Erlaubte Farben': 'İzin verilen renkler',
+  'Erst Farben anlegen.': 'Önce renkleri oluşturun.',
+  'Erst Varianten anlegen.': 'Önce varyantları oluşturun.',
+  'Etikett drucken': 'Etiket yazdır',
+  'Etikett gespeichert — in Brother App öffnen zum Drucken': 'Etiket kaydedildi — yazdırmak için Brother uygulamasında açın',
+  'Etikett geteilt': 'Etiket paylaşıldı',
+  'Faltenanzahl/Rolle': 'Pile sayısı/Rulo',
+  'Farb-Katalog': 'Renk kataloğu',
+  'Farb-Mapping (Bestellfarbe → Materialfarbe)': 'Renk eşleştirme (Sipariş rengi → Malzeme rengi)',
+  'Farbe': 'Renk',
+  'Farbe gelöscht.': 'Renk silindi.',
+  'Farbe gespeichert.': 'Renk kaydedildi.',
+  'Farben stimmen überein, kein Mapping nötig.': 'Renkler eşleşiyor, eşleştirme gerekmiyor.',
+  'Fehler bei Umwandlung:': 'Dönüştürme hatası:',
+  'Fehler beim Laden.': 'Yükleme hatası.',
+  'Fehler beim Sortieren:': 'Sıralama hatası:',
+  'Fehler:': 'Hata:',
+  'Fehlmenge': 'Eksik miktar',
+  'Fester Verbrauch pro Bestellung': 'Sipariş başına sabit tüketim',
+  'Filiale': 'Şube',
+  'Filiale gelöscht.': 'Şube silindi.',
+  'Filiale gespeichert!': 'Şube kaydedildi!',
+  'Filiale zugewiesen:': 'Şube atandı:',
+  'Filiale zuweisen': 'Şube ata',
+  'Filialen': 'Şubeler',
+  'Firmenlogo': 'Firma logosu',
+  'Firmenname *': 'Firma adı *',
+  'Fliegengitter': 'Sineklik',
+  'Fliegengitter & Insektenschutz': 'Sineklik & Böcek Koruması',
+  'Fliegengitter App': 'Sineklik Uygulaması',
+  'Fliegengitter App · Version': 'Sineklik Uygulaması · Sürüm',
+  'Fläche': 'Alan',
+  'Fläche nach Farbe': 'Renge göre alan',
+  'Flächenmaterial (pro m²)': 'Alan malzemesi (m² başına)',
+  'Frist (optional)': 'Termin (isteğe bağlı)',
+  'Fristdatum': 'Termin tarihi',
+  'Gesamt': 'Toplam',
+  'Gesamt Falten': 'Toplam pile',
+  'Gesamt Meter': 'Toplam metre',
+  'Gesamt Umsatz': 'Toplam ciro',
+  'Gesamt m²': 'Toplam m²',
+  'Gesamt:': 'Toplam:',
+  'Gezählt...': 'Sayılıyor...',
+  'Globale Farben für Modelle und Materialien.': 'Modeller ve malzemeler için global renkler.',
+  'Globale Profil-Farben für Modelle und Materialien.': 'Modeller ve malzemeler için global profil renkleri.',
+  'Hallo {name}, Ihre Fliegengitter-Bestellung ist fertig...': 'Merhaba {name}, Sineklik siparişiniz hazır...',
+  'Hintergrundfarbe (Hex)': 'Arka plan rengi (Hex)',
+  'Hintergrundfarbe (Vorschau)': 'Arka plan rengi (önizleme)',
+  'Hinweis:': 'Uyarı:',
+  'Hinzufügen': 'Ekle',
+  'HÖHE': 'YÜKSEKLİK',
+  'Höhe': 'Yükseklik',
+  'Höhe (cm)': 'Yükseklik (cm)',
+  'Höhe/Länge (cm)': 'Yükseklik/Uzunluk (cm)',
+  'IBAN': 'IBAN',
+  'INAKTIV': 'PASİF',
+  'Im "Neue Bestellung"-Tab kannst du eine Bestellung als Entwurf speichern.': '"Yeni Sipariş" sekmesinde bir siparişi taslak olarak kaydedebilirsiniz.',
+  'Im Modell': 'Modelde',
+  'Immer Doppeltür': 'Her zaman çift kanat',
+  'Immer Einzeltür': 'Her zaman tek kanat',
+  'In Schnittliste anzeigen': 'Kesim listesinde göster',
+  'Inaktive Materialien erscheinen nicht in der Schnittliste und werden nicht vom Lager abgezogen. Bestehende Buchungen bleiben erhalten.': 'Pasif malzemeler kesim listesinde görünmez ve depodan düşülmez. Mevcut kayıtlar korunur.',
+  'Inhaber / Geschäftsführer': 'Sahibi / Yönetici',
+  'Inventur durchführen': 'Sayım yap',
+  'Inventur gespeichert!': 'Sayım kaydedildi!',
+  'Inventur speichern': 'Sayımı kaydet',
+  'Ist:': 'Mevcut:',
+  'Jede Zeile = ein Eintrag in der Schnittliste. Maß = (Breite oder Höhe) − Abzug.': 'Her satır = kesim listesinde bir kayıt. Ölçü = (Genişlik veya Yükseklik) − Pay.',
+  'Jetzt aktualisieren': 'Şimdi güncelle',
+  'Jetzt unterschreiben lassen': 'Şimdi imzalat',
+  'Kein Entwurf geladen.': 'Yüklü taslak yok.',
+  'Kein Logo': 'Logo yok',
+  'Kein gültiges Backup.': 'Geçerli yedek yok.',
+  'Keine Aktivitäten': 'Aktivite yok',
+  'Keine Artikel': 'Ürün yok',
+  'Keine Berechtigung für diese Verschiebung.': 'Bu taşıma işlemi için yetkiniz yok.',
+  'Keine Berechtigung.': 'Yetkiniz yok.',
+  'Keine Bestellung geladen.': 'Yüklü sipariş yok.',
+  'Keine Cuts. Klicke "+ Cut".': 'Kesim yok. "+ Kesim"e tıklayın.',
+  'Keine Filialen angelegt.': 'Şube oluşturulmamış.',
+  'Keine Materialien angelegt.': 'Malzeme oluşturulmamış.',
+  'Keine Materialien in der Schnittliste. Klicke "+ Material hinzufügen".': 'Kesim listesinde malzeme yok. "+ Malzeme ekle"ye tıklayın.',
+  'Keine Mitglieder gefunden.': 'Üye bulunamadı.',
+  'Keine Schnittmaße definiert. Klicke "+ Schnittmaß hinzufügen".': 'Kesim ölçüsü tanımlanmamış. "+ Kesim ölçüsü ekle"ye tıklayın.',
+  'Keine Unterschrift vorhanden.': 'İmza mevcut değil.',
+  'Klassik': 'Klasik',
+  'Klicke "+ Neue Plissee-Farbe" um z.B. Grün, Lila, Beige anzulegen.': 'Örn. Yeşil, Mor, Bej oluşturmak için "+ Yeni plise rengi"ne tıklayın.',
+  'Kunde': 'Müşteri',
+  'Kunde benachrichtigen': 'Müşteriyi bilgilendir',
+  'Kunde hat unterschrieben': 'Müşteri imzaladı',
+  'Kundendaten': 'Müşteri bilgileri',
+  'Kurzname': 'Kısa ad',
+  'Kurzname geändert.': 'Kısa ad değiştirildi.',
+  'Kurzname ändern': 'Kısa adı değiştir',
+  'Kurzname...': 'Kısa ad...',
+  'LAGER': 'DEPO',
+  'Label': 'Etiket',
+  'Label (z.B. Einzeltür)': 'Etiket (örn. Tek kanat)',
+  'Lager': 'Depo',
+  'Lagerabzug erfolgt unabhängig davon, sobald eine Verbrauchsart definiert ist.': 'Bir tüketim türü tanımlandığında depo düşümü bundan bağımsız olarak yapılır.',
+  'Letzte Eingänge': 'Son girişler',
+  'Letzte Inventuren': 'Son sayımlar',
+  'Lieferant': 'Tedarikçi',
+  'Lieferant (optional)': 'Tedarikçi (isteğe bağlı)',
+  'Logo': 'Logo',
+  'Logo entfernen': 'Logoyu kaldır',
+  'Logo entfernt.': 'Logo kaldırıldı.',
+  'Logo hochgeladen.': 'Logo yüklendi.',
+  'Logo zu groß auch nach Verkleinerung. Bitte ein anderes Bild wählen.': 'Küçültmeden sonra bile logo çok büyük. Lütfen başka bir resim seçin.',
+  'Löschen': 'Sil',
+  'Material': 'Malzeme',
+  'Material entfernen': 'Malzemeyi kaldır',
+  'Material gelöscht.': 'Malzeme silindi.',
+  'Material gespeichert!': 'Malzeme kaydedildi!',
+  'Material nicht gefunden': 'Malzeme bulunamadı',
+  'Material wählen': 'Malzeme seç',
+  'Materialien': 'Malzemeler',
+  'Materialien mit Schnittmaßen für dieses Modell. Reihenfolge per ▲▼.': 'Bu model için kesim ölçülü malzemeler. Sıralama ▲▼ ile.',
+  'Materialien werden geladen...': 'Malzemeler yükleniyor...',
+  'Materialtyp': 'Malzeme tipi',
+  'Max Breite': 'Maks genişlik',
+  'Max Höhe': 'Maks yükseklik',
+  'Maß': 'Ölçü',
+  'Maß = (Breite oder Höhe) − Abzug.': 'Ölçü = (Genişlik veya Yükseklik) − Pay.',
+  'Maß-Grenzen (cm)': 'Ölçü sınırları (cm)',
+  'Maße': 'Ölçüler',
+  'Menge': 'Miktar',
+  'Menü': 'Menü',
+  'Meter/Rolle': 'Metre/Rulo',
+  'Migration auf Modell-System': 'Model sistemine geçiş',
+  'Migration erfolgreich.': 'Geçiş başarılı.',
+  'Migration läuft…': 'Geçiş yapılıyor…',
+  'Migration nötig:': 'Geçiş gerekli:',
+  'Migration starten': 'Geçişi başlat',
+  'Migrationsfehler:': 'Geçiş hatası:',
+  'Min Breite': 'Min genişlik',
+  'Min Doppeltür': 'Min çift kanat',
+  'Min Einzeltür': 'Min tek kanat',
+  'Min Höhe': 'Min yükseklik',
+  'Mindestbestand': 'Minimum stok',
+  'Mindestbestand Falten': 'Minimum stok pile',
+  'Mindestens 6 Zeichen': 'En az 6 karakter',
+  'Mindestens ein gültiges Maß nötig.': 'En az bir geçerli ölçü gerekli.',
+  'Mindestens eine Option erforderlich.': 'En az bir seçenek gerekli.',
+  'Minimum': 'Minimum',
+  'Mitarbeiter': 'Çalışanlar',
+  'Mitarbeiter anlegen': 'Çalışan ekle',
+  'Mitarbeiter einladen': 'Çalışan davet et',
+  'Mitarbeiter wählt (per Variante)': 'Çalışan seçer (varyant başına)',
+  'Mitarbeiter-Leistung': 'Çalışan performansı',
+  'Mitglieder': 'Üyeler',
+  'Modell': 'Model',
+  'Modell gelöscht.': 'Model silindi.',
+  'Modell gespeichert.': 'Model kaydedildi.',
+  'Modelle': 'Modeller',
+  'NUR DT': 'SADECE ÇK',
+  'NUR ET': 'SADECE TK',
+  'Nach Farbe getrennt': 'Renge göre ayrılmış',
+  'Nach dem Speichern wird die Reparatur in der Spalte': 'Kaydettikten sonra tamir şu sütunda olur:',
+  'Nachbestellen!': 'Yeniden sipariş et!',
+  'Nachname': 'Soyad',
+  'Name': 'Ad',
+  'Name eingeben...': 'Ad girin...',
+  'Netz/Gitter (Tül)': 'Tül',
+  'Neu': 'Yeni',
+  'Neue Bestellung': 'Yeni sipariş',
+  'Neue Maße': 'Yeni ölçüler',
+  'Neue Spalte...': 'Yeni sütun...',
+  'Neue Version verfügbar': 'Yeni sürüm mevcut',
+  'Noch kein Backup heruntergeladen!': 'Henüz yedek indirilmedi!',
+  'Noch kein Bestand eingetragen': 'Henüz stok kaydedilmemiş',
+  'Noch kein Bestand. Buche zuerst einen Wareneingang.': 'Henüz stok yok. Önce mal girişi yapın.',
+  'Noch keine Eingänge.': 'Henüz giriş yok.',
+  'Noch keine Farben angelegt. Klicke "+ Neue Farbe".': 'Henüz renk oluşturulmamış. "+ Yeni renk"e tıklayın.',
+  'Noch keine Inventur durchgeführt.': 'Henüz sayım yapılmamış.',
+  'Noch keine Modelle angelegt.': 'Henüz model oluşturulmamış.',
+  'Noch keine Plissee-Farben angelegt.': 'Henüz plise rengi oluşturulmamış.',
+  'Noch keine Unterschrift': 'Henüz imza yok',
+  'Noch keine Varianten angelegt.': 'Henüz varyant oluşturulmamış.',
+  'Nur Superadmin kann Admin-Rollen ändern.': 'Yönetici rollerini yalnızca Süper Yönetici değiştirebilir.',
+  'Nur Superadmin kann Backups wiederherstellen.': 'Yedeklemeleri yalnızca Süper Yönetici geri yükleyebilir.',
+  'Nur Superadmin.': 'Yalnızca Süper Yönetici.',
+  'Nur bei Doppeltür anzeigen (z.B. für Kombi)': 'Sadece çift kanatta göster (örn. Kombi için)',
+  'Offen': 'Açık',
+  'Optional...': 'İsteğe bağlı...',
+  'Optionale Bemerkung...': 'İsteğe bağlı not...',
+  'Optionen': 'Seçenekler',
+  'Original-Bestellung nicht gefunden.': 'Orijinal sipariş bulunamadı.',
+  'Original-Bestellung:': 'Orijinal sipariş:',
+  'Original:': 'Orijinal:',
+  'Override aktiv': 'Geçersiz kılma aktif',
+  'PDF': 'PDF',
+  'PNG, JPG. Wird automatisch verkleinert.': 'PNG, JPG. Otomatik olarak küçültülür.',
+  'Passende B-Ware gefunden!': 'Uygun B Ürün bulundu!',
+  'Passwort': 'Şifre',
+  'Passwort muss mindestens 6 Zeichen haben.': 'Şifre en az 6 karakter olmalıdır.',
+  'Pfeilsymbol für Grafik (z.B. → ← ↓ ↑ →←)': 'Grafik için ok sembolü (örn. → ← ↓ ↑ →←)',
+  'Plissee-Farbe': 'Plise rengi',
+  'Plissee-Farbe gelöscht.': 'Plise rengi silindi.',
+  'Plissee-Farbe gespeichert.': 'Plise rengi kaydedildi.',
+  'Plissee-Farben': 'Plise renkleri',
+  'Plissee-Stoff-Farben (z.B. Grün, Lila). Werden bei Variante "Plissee" zur Auswahl angeboten. Inaktive sind ausgeblendet.': 'Plise kumaş renkleri (örn. Yeşil, Mor). "Plise" varyantında seçim için sunulur. Pasif olanlar gizlenir.',
+  'Popup-Blocker deaktivieren!': 'Popup engelleyicisini kapatın!',
+  'Popup-Blocker deaktivieren.': 'Popup engelleyicisini kapatın.',
+  'Preis': 'Fiyat',
+  'Preis für Doppeltür pro m²': 'Çift kanat için m² fiyatı',
+  'Preis pro Quadratmeter': 'Metrekare başına fiyat',
+  'Preis € (optional)': 'Fiyat € (isteğe bağlı)',
+  'Preise (€/m²)': 'Fiyatlar (€/m²)',
+  'Preisübersicht': 'Fiyat genel bakış',
+  'Pro Bestellung': 'Sipariş başına',
+  'Pro Einheit': 'Birim başına',
+  'Pro m² berechnet': 'm² başına hesaplanır',
+  'Prod.': 'Üret.',
+  'Produktion': 'Üretim',
+  'Produktvarianten mit eigener Schnittliste, Preisen, Farben.': 'Kendi kesim listesi, fiyatları ve renkleri olan ürün varyantları.',
+  'Profile (nach Farbe)': 'Profiller (renge göre)',
+  'Prüfe…': 'Kontrol ediliyor…',
+  'Rechte': 'Yetkiler',
+  'Reparatur': 'Tamir',
+  'Reparatur erfassen': 'Tamir kaydet',
+  'Reparatur erstellen': 'Tamir oluştur',
+  'Reparatur-Bestellung': 'Tamir siparişi',
+  'Reparatur-Preis (€)': 'Tamir fiyatı (€)',
+  'Reparatur-Umsatz (separat)': 'Tamir cirosu (ayrı)',
+  'Reparaturen über den': 'Tamirleri şu üzerinden:',
+  'Rest:': 'Kalan:',
+  'Restbetrag €': 'Kalan tutar €',
+  'Rolle': 'Rol',
+  'Rolle wechseln': 'Rol değiştir',
+  'Rollenlänge (m)': 'Rulo uzunluğu (m)',
+  'Rollenmaterial': 'Rulo malzeme',
+  'SCHNITTLISTE': 'KESİM LİSTESİ',
+  'SMS': 'SMS',
+  'STK': 'ADET',
+  'Schließen': 'Kapat',
+  'Schnittliste': 'Kesim listesi',
+  'Schnittliste komplett aus Materialien neu aufbauen? Bestehende Cuts in dieser Schnittliste gehen verloren.': 'Kesim listesini malzemelerden tamamen yeniden oluştur? Bu kesim listesindeki mevcut kesimler kaybolur.',
+  'Schnittliste leer.': 'Kesim listesi boş.',
+  'Schnittmaße': 'Kesim ölçüleri',
+  'Schnittmaße (Abzüge für dieses Material)': 'Kesim ölçüleri (bu malzeme için paylar)',
+  'Schnittmaße (Abzüge)': 'Kesim ölçüleri (paylar)',
+  'Schriftfarbe (Hex)': 'Yazı rengi (Hex)',
+  'Schriftfarbe (Vorschau)': 'Yazı rengi (önizleme)',
+  'Skizzen': 'Çizimler',
+  'So funktioniert\'s:': 'Nasıl çalışır:',
+  'Sonstige Materialien': 'Diğer malzemeler',
+  'Spalte enthält noch Bestellungen.': 'Sütun hâlâ siparişler içeriyor.',
+  'Spalte existiert bereits.': 'Sütun zaten mevcut.',
+  'Spalten verwalten': 'Sütunları yönet',
+  'Speichern': 'Kaydet',
+  'Speichern fehlgeschlagen:': 'Kaydetme başarısız:',
+  'Standard': 'Standart',
+  'Stangenlänge (m)': 'Çubuk uzunluğu (m)',
+  'Stangenmaterial': 'Çubuk malzeme',
+  'Statistik': 'İstatistik',
+  'Status': 'Durum',
+  'Status prüfen': 'Durumu kontrol et',
+  'Status-Übersicht': 'Durum genel bakış',
+  'Stk': 'Adet',
+  'Stk überschreiben': 'Adet geçersiz kıl',
+  'Straße, PLZ Ort': 'Sokak, Posta kodu Şehir',
+  'Stück': 'Adet',
+  'Stückmaterial': 'Adet malzeme',
+  'Stückzahl': 'Adet sayısı',
+  'Suche nach Name, Telefon...': 'Ad, telefon ile ara...',
+  'Telefon': 'Telefon',
+  'Telefon ist bei einer Bestellung Pflicht. Bitte eintragen.': 'Sipariş için telefon zorunludur. Lütfen girin.',
+  'Trage den aktuellen Ist-Bestand ein. Die Differenz zum Soll-Bestand wird automatisch berechnet.': 'Mevcut stoğu girin. Olması gereken stoktan farkı otomatik hesaplanır.',
+  'Tül Adet': 'Tül Adet',
+  'Tül Adet (Gitterfalten)': 'Tül Adet (tül pile)',
+  'Tül Adet:': 'Tül Adet:',
+  'Tül Länge': 'Tül Uzunluğu',
+  'Tül Länge:': 'Tül Uzunluğu:',
+  'Tül-Adet': 'Tül-Adet',
+  'Türart-Vorgabe': 'Kapı tipi tanımı',
+  'Umsatz-Entwicklung (6 Monate)': 'Ciro gelişimi (6 ay)',
+  'Ungültige Datei.': 'Geçersiz dosya.',
+  'Unterschrift': 'İmza',
+  'Unterschrift anzeigen': 'İmzayı göster',
+  'Unterschrift gespeichert!': 'İmza kaydedildi!',
+  'Unterschrift:': 'İmza:',
+  'Variante gelöscht.': 'Varyant silindi.',
+  'Variante gespeichert.': 'Varyant kaydedildi.',
+  'Varianten': 'Varyantlar',
+  'Varianten bei Erfassung abfragen': 'Kayıt sırasında varyantları sor',
+  'Verbrauch pro Bestellung': 'Sipariş başına tüketim',
+  'Verbrauch pro m² – Doppeltür (Meter, optional)': 'm² başına tüketim – Çift kanat (metre, isteğe bağlı)',
+  'Verbrauch pro m² – Einzeltür (Meter)': 'm² başına tüketim – Tek kanat (metre)',
+  'Verbrauchsart': 'Tüketim türü',
+  'Verfügbare Farben (kommagetrennt)': 'Mevcut renkler (virgülle ayırın)',
+  'Verfügbare Höhen (cm, kommagetrennt)': 'Mevcut yükseklikler (cm, virgülle ayırın)',
+  'Version': 'Sürüm',
+  'Vorher Backup ziehen!': 'Önceden yedek alın!',
+  'Vorname': 'Ad',
+  'Vorschlag Doppeltür': 'Çift kanat önerisi',
+  'Vorschlag Einzeltür': 'Tek kanat önerisi',
+  'Wareneingang buchen': 'Mal girişi kaydet',
+  'Website': 'Web sitesi',
+  'Weiß': 'Beyaz',
+  'Welche Farben kann der Mitarbeiter bei diesem Modell wählen?': 'Çalışan bu modelde hangi renkleri seçebilir?',
+  'Welche Varianten soll der Mitarbeiter pro Maß auswählen?': 'Çalışan ölçü başına hangi varyantları seçmeli?',
+  'Wenn die Bestellfarbe nicht direkt existiert, welche Materialfarbe wird verwendet?': 'Sipariş rengi doğrudan mevcut değilse hangi malzeme rengi kullanılır?',
+  'Wenn leer: bei Doppeltür wird derselbe Wert wie bei Einzeltür verwendet.': 'Boş bırakılırsa: çift kanatta tek kanattaki değer kullanılır.',
+  'WhatsApp': 'WhatsApp',
+  'WhatsApp-Nachricht': 'WhatsApp mesajı',
+  'Wiederverwendbare Auswahl-Optionen wie Türart, Plissee, Stoffart.': 'Kapı tipi, plise, kumaş tipi gibi yeniden kullanılabilir seçim seçenekleri.',
+  'Wird angelegt...': 'Oluşturuluyor...',
+  'Wird geladen...': 'Yükleniyor...',
+  'Zurück zur Bestellung': 'Siparişe geri dön',
+  'Zuweisen': 'Ata',
+  'antippen für Details →': 'detaylar için dokunun →',
+  'ein um zu bestätigen:': 'onaylamak için yazın:',
+  'kurze Beschreibung': 'kısa açıklama',
+  'mit allen heutigen Materialien an.': 'bugünkü tüm malzemelerle.',
+  'm²-Preis (€)': 'm² fiyatı (€)',
+  'wurden noch keine Materialien zugewiesen.': 'henüz malzeme atanmamış.',
+  'z.B. 13.1 – leer = wie Einzeltür': 'örn. 13.1 – boş = tek kanatla aynı',
+  'z.B. Ali, Mehmet...': 'örn. Ali, Mehmet...',
+  'z.B. Bella Home GmbH': 'örn. Bella Home GmbH',
+  'z.B. Eckverbinder': 'örn. Köşe bağlayıcı',
+  'z.B. Filiale Wien': 'örn. Viyana Şubesi',
+  'z.B. Großhändler': 'örn. Toptancı',
+  'z.B. Grün, Lila, Beige': 'örn. Yeşil, Mor, Bej',
+  'z.B. Klassik, Schwellenlos, Kombi': 'örn. Klasik, Eşiksiz, Kombi',
+  'z.B. Kunde hatte falsch gemessen, kürzen auf 95×195': 'örn. Müşteri yanlış ölçmüş, 95×195 olarak kısaltılacak',
+  'z.B. Mariahilferstraße 123, 1060 Wien': 'örn. Mariahilferstraße 123, 1060 Viyana',
+  'z.B. Schwarz matt': 'örn. Mat siyah',
+  'z.B. Schwarz, Weiß': 'örn. Siyah, Beyaz',
+  'z.B. Stück, Meter, Rollen': 'örn. Adet, Metre, Rulo',
+  'z.B. Türart, Plissee, Öffnungsrichtung': 'örn. Kapı tipi, Plise, Açılış yönü',
+  'zurücksetzen': 'sıfırla',
+  '· Tül Adet:': '· Tül Adet:',
+  'Änderungen gespeichert!': 'Değişiklikler kaydedildi!',
+  'Ø Bestellung': 'Ø Sipariş',
+  'Übernimmt aktuelle Cuts aus den Materialien (nur leere Schnittliste)': 'Malzemelerden mevcut kesimleri alır (yalnızca boş kesim listesi)',
+  '— Farbe wählen —': '— Renk seçin —',
+  '— Filiale wählen —': '— Şube seçin —',
+  '— Keine Filiale —': '— Şube yok —',
+  '— Material wählen —': '— Malzeme seçin —',
+  '— keine Filiale —': '— şube yok —',
+  '→ Nutzbar:': '→ Kullanılabilir:',
+  '↻ Aktualisieren': '↻ Güncelle',
+  '⚠️ Keine Telefonnummer hinterlegt': '⚠️ Telefon numarası kayıtlı değil',
+  '✓ Bestätigen': '✓ Onayla',
+  '✓ Migration abgeschlossen.': '✓ Geçiş tamamlandı.',
+  '＋ Artikel hinzufügen': '＋ Ürün ekle',
+  '＋ B-Ware eintragen': '＋ B Ürün kaydet',
+  '＋ Maß hinzufügen': '＋ Ölçü ekle',
+  '＋ Zahlung': '＋ Ödeme',
+  '🏢 Firmendaten': '🏢 Firma Bilgileri',
+  '💾 B-Ware speichern': '💾 B Ürün kaydet',
+  '📝 Du bearbeitest einen Entwurf': '📝 Bir taslak düzenliyorsunuz',
+  '📝 Entwürfe': '📝 Taslaklar',
+  '📤 Logo hochladen': '📤 Logo yükle',
+  '🔧 Reparatur erfassen': '🔧 Tamir kaydet',
+  '🗑 Entwurf löschen': '🗑 Taslağı sil',
+  '🗑️ Löschen': '🗑️ Sil',
+  'Bestelldatum: älteste zuerst': 'Sipariş tarihi: en eski önce',
+  'Bestelldatum: neueste zuerst': 'Sipariş tarihi: en yeni önce',
+  'Frist: früheste zuerst': 'Tarih: en erken önce',
+  'Frist: späteste zuerst': 'Tarih: en geç önce',
+  'Zuletzt verschoben: neueste oben': 'Son taşıma: en yeni üstte',
+  'Zuletzt verschoben: älteste oben': 'Son taşıma: en eski üstte',
+  'Preisanfragen ohne fixe Bestellung. Mit Frist werden sie nach Ablauf automatisch gelöscht. Beim Umwandeln zur Bestellung wird eine richtige Bestellnummer vergeben.': 'Sabit sipariş olmayan fiyat sorguları. Süre dolduğunda otomatik silinir. Siparişe dönüştürüldüğünde gerçek bir sipariş numarası verilir.',
+  'Eintrag': 'Kayıt',
+  'Einträge': 'Kayıt',
+  'Warteliste': 'Bekleme listesi',
+  'Bestellung': 'Sipariş',
+  'In Produktion': 'Üretimde',
+  'Abholbereit': 'Teslime hazır',
+  'Abgeholt': 'Teslim alındı',
+  'Gelöscht': 'Silindi',
+  'Gesperrt – wird von': 'Kilitli - şu kişi tarafından düzenleniyor:',
+  'jemand': 'biri',
+  'bearbeitet': 'düzenliyor',
+  'Frist:': 'Tarih:',
+  '+ Yeni': '+ Yeni',
+  '+ Yeni taslak': '+ Yeni taslak',
+  'TASLAKLAR': 'TASLAKLAR',
+  'Wareneingang': 'Mal kabulü',
+  'Inventur': 'Sayım',
+  'Material verwalten': 'Malzeme yönetimi',
+  'Einstellungen & Mitarbeiter': 'Ayarlar ve Çalışanlar',
+  'Sprache / Dil': 'Sprache / Dil',
+  'Bestand-Übersicht': 'Stok genel bakış',
+  'Alle Filialen sehen (auch fremde)': 'Tüm şubeleri gör (yabancı şubeler dahil)'
+};
+
+let currentLanguage = 'de';
+
+function loadLanguagePreference() {
+    try {
+        const stored = localStorage.getItem('app_language');
+        if (stored === 'tr' || stored === 'de') currentLanguage = stored;
+    } catch(e) {}
+}
+
+async function setLanguage(lang) {
+    if (lang !== 'de' && lang !== 'tr') return;
+    currentLanguage = lang;
+    try { localStorage.setItem('app_language', lang); } catch(e) {}
+    // v1.18.2-phase1: WARTEN auf Firestore-Update bevor reload (Race-Condition-Fix)
+    if (currentUser && currentUser.uid) {
+        try {
+            await db.collection('members').doc(currentUser.uid).update({ language: lang });
+        } catch(e) {
+            console.log('Sprache konnte nicht in Firestore gespeichert werden:', e);
+            // Trotzdem reloaden - localStorage hat den Wert
+        }
+    }
+    location.reload();
+}
+
+// Direkter Lookup für JS-Code: t('Speichern') → 'Kaydet'
+function t(de) {
+    if (currentLanguage === 'de') return de;
+    return TRANSLATIONS_TR[de] || de;
+}
+
+// HTML-Auto-Translate: scannt Text-Knoten und ersetzt deutsche Strings
+// Wird ÜBER alle Render-Aufrufe gehookt via MutationObserver
+function applyTranslationsToElement(root) {
+    if (currentLanguage === 'de') return;
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    const nodes = [];
+    let n;
+    while ((n = walker.nextNode())) {
+        const trimmed = n.nodeValue.trim();
+        if (!trimmed) continue;
+        if (TRANSLATIONS_TR[trimmed]) nodes.push(n);
+    }
+    nodes.forEach(node => {
+        const trimmed = node.nodeValue.trim();
+        const tx = TRANSLATIONS_TR[trimmed];
+        if (tx) node.nodeValue = node.nodeValue.replace(trimmed, tx);
+    });
+    // Auch placeholder-Attribute
+    const inputs = root.querySelectorAll ? root.querySelectorAll('input[placeholder], textarea[placeholder]') : [];
+    inputs.forEach(el => {
+        const ph = el.getAttribute('placeholder');
+        if (ph && TRANSLATIONS_TR[ph.trim()]) {
+            el.setAttribute('placeholder', TRANSLATIONS_TR[ph.trim()]);
+        }
+    });
+    // title-Attribute
+    const titles = root.querySelectorAll ? root.querySelectorAll('[title]') : [];
+    titles.forEach(el => {
+        const ti = el.getAttribute('title');
+        if (ti && TRANSLATIONS_TR[ti.trim()]) {
+            el.setAttribute('title', TRANSLATIONS_TR[ti.trim()]);
+        }
+    });
+}
+
+// MutationObserver: jedes Mal wenn DOM neu gerendert wird → übersetzen
+let _i18nObserver = null;
+function startI18nObserver() {
+    if (currentLanguage === 'de') return;
+    if (_i18nObserver) return;
+    _i18nObserver = new MutationObserver((mutations) => {
+        mutations.forEach(m => {
+            m.addedNodes.forEach(node => {
+                if (node.nodeType === 1) applyTranslationsToElement(node);
+                else if (node.nodeType === 3 && node.nodeValue) {
+                    const tx = TRANSLATIONS_TR[node.nodeValue.trim()];
+                    if (tx) node.nodeValue = node.nodeValue.replace(node.nodeValue.trim(), tx);
+                }
+            });
+            // Bei character-data oder attribute-Änderung
+            if (m.type === 'characterData' && m.target.nodeValue) {
+                const tx = TRANSLATIONS_TR[m.target.nodeValue.trim()];
+                if (tx && m.target.nodeValue.trim() !== tx) {
+                    m.target.nodeValue = m.target.nodeValue.replace(m.target.nodeValue.trim(), tx);
+                }
+            }
+        });
+    });
+    _i18nObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    // Initial: alles im Body übersetzen
+    applyTranslationsToElement(document.body);
+}
+
+// Beim ersten Laden anwenden
+loadLanguagePreference();
+
+// ═══ STATE ═══
+
+// ═══════════════════════════════════════════════════════════════════
+// MATERIAL-ÜBERSETZUNGEN (v1.18.7)
+//
+// Material-Namen kommen aus der Firebase-DB und sind teilweise mit alten
+// Schreibweisen gespeichert. Dieses System ändert NICHTS in der DB,
+// sondern übersetzt nur bei der ANZEIGE:
+//
+//   - MATERIAL_DE_CLEAN: alte DB-Schreibweise → saubere deutsche Anzeige
+//     (z.B. "Tül" wird angezeigt als "Netz" wenn Sprache=DE)
+//
+//   - MATERIAL_TR: Material-Name → türkische Anzeige
+//     (bedient sowohl alte DB-Werte als auch bereinigte DE-Schreibweisen)
+//
+// translateMaterial(name) ist die zentrale Funktion. Wird in der
+// Schnittliste, im Rechner und in der Auswertung aufgerufen.
+// ═══════════════════════════════════════════════════════════════════
+
+// Alte DB-Werte → bereinigte deutsche Anzeige
+const MATERIAL_DE_CLEAN = {
+    'Tül': 'Netz',
+    'Plastik Kisa': 'Plastik Kurz',
+    'Tül Adet': 'Netz Faltenanzahl',
+};
+
+// Material-Namen → Türkisch
+const MATERIAL_TR = {
+    // Material-Kategorien
+    'Rahmen 26X39': 'Çerçeve 26X39',
+    'Bodenprofil': 'Taban profili',
+    'Flügel': 'Kanat',
+    'Netz': 'Tül',
+    'Plastik': 'Plastik',
+    'Eckverbindung': 'Köşe bağlantısı',
+    'Snurhalter': 'Bağcık tutucusu',
+    'Fitil': 'Fitil',
+    'Kunststoffbolzen': 'Plastik cıvata',
+    // Cut-Labels (bereinigte DE-Schreibweise)
+    'Rahmen Breite': 'Çerçeve Genişlik',
+    'Rahmen Höhe': 'Çerçeve Yükseklik',
+    'Plastik Kurz': 'Kısa Plastik',
+    'Netz Faltenanzahl': 'Tül Pile Adedi',
+    'Pro Bestellung': 'Sipariş başına',
+    // Cut-Labels (alte DB-Schreibweise — direkt nach TR)
+    'Tül': 'Tül',
+    'Plastik Kisa': 'Kısa Plastik',
+    'Tül Adet': 'Tül Pile Adedi',
+    // Modell-Namen
+    'Fliegengitter Klassik': 'Sineklik Klasik',
+    // Einheiten
+    'Stück': 'Adet',
+    'Stk': 'Adet',
+    'Meter': 'Metre',
+    'Stangen': 'Çubuk',
+    'Falten': 'Pile',
+    'Rollen': 'Rulo',
+};
+
+/**
+ * Übersetzt einen Material-Namen für die Anzeige.
+ * - DB-Wert bleibt unverändert, nur Anzeige wird übersetzt
+ * - DE-Modus: alte DB-Schreibweisen werden zu bereinigten DE-Anzeigen
+ * - TR-Modus: Lookup über deutsche Anzeige zur türkischen
+ *
+ * @param {string} name - Der Material-Name aus der DB
+ * @returns {string} - Übersetzte Anzeige
+ */
+function translateMaterial(name) {
+    if (!name) return name;
+    const trimmed = String(name).trim();
+    // Erst: alte DB-Schreibweise → bereinigte DE-Anzeige
+    const cleanedDE = MATERIAL_DE_CLEAN[trimmed] || trimmed;
+    if (currentLanguage === 'de') return cleanedDE;
+    // TR: erst direkt (alte DB-Schreibweise), dann über bereinigte DE
+    return MATERIAL_TR[trimmed] || MATERIAL_TR[cleanedDE] || cleanedDE;
+}

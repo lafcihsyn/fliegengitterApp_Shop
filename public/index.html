@@ -1,0 +1,2496 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#534AB7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Fliegengitter">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <title>Fliegengitter</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+    <div class="login-box">
+        <div class="login-logo" style="font-size:32px;color:var(--primary)"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/></svg></div>
+        <div class="login-title">Fliegengitter</div>
+        <div class="login-subtitle">Bitte anmelden</div>
+        <div class="login-field"><label>E-Mail</label><input type="email" id="loginEmail" placeholder="email@beispiel.de" autocomplete="email"></div>
+        <div class="login-field"><label>Passwort</label>
+            <div style="position:relative">
+                <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+                <button type="button" onclick="togglePwVisibility()" id="pwToggle" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:14px;cursor:pointer;padding:4px;color:var(--text-muted)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+            </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:13px;color:var(--text-secondary);cursor:pointer">
+            <input type="checkbox" id="rememberMe" checked style="width:18px;height:18px;accent-color:var(--primary)"> Angemeldet bleiben
+        </label>
+        <button class="login-btn" onclick="doLogin()">Anmelden</button>
+        <div class="login-error" id="loginError"></div>
+        <button type="button" onclick="openPasswordResetModal()" style="display:block;width:100%;margin-top:12px;background:none;border:none;color:var(--primary);font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline;text-decoration-color:rgba(0,0,0,0.15);text-underline-offset:3px">Passwort vergessen?</button>
+        <div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:12px" id="loginVersion"></div>
+    </div>
+</div>
+
+<!-- v1.18.21: Passwort-Reset Modal -->
+<!-- v1.18.22: Status-Dropdown in Bestelldetails, Etiketten- und Schnittliste-Zählung pro Stück, Pfeile fixen, Schnittliste-Zahl größer -->
+<!-- v1.18.23: Status-Dropdown filtert nach Berechtigung, Reparatur entfernt (eigener Workflow) -->
+
+<div id="pwResetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)" onclick="if(event.target===this)closePasswordResetModal()">
+    <div style="background:var(--card);border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <h3 style="margin:0;font-size:18px;color:var(--text)">Passwort zurücksetzen</h3>
+            <button type="button" onclick="closePasswordResetModal()" style="background:var(--border-light);border:none;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary);font-family:inherit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <p style="margin:0 0 16px;font-size:13px;color:var(--text-secondary);line-height:1.5">Gib deine Email-Adresse ein. Wir schicken dir einen Link zum Zurücksetzen des Passworts.</p>
+        <div class="field" style="margin-bottom:14px">
+            <label style="display:block;font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Email</label>
+            <input type="email" id="pwResetEmail" placeholder="email@beispiel.at" autocomplete="email" style="width:100%;padding:11px 12px;font-size:15px;border:1px solid var(--border);border-radius:8px;font-family:inherit">
+        </div>
+        <div id="pwResetMessage" style="display:none;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:12px"></div>
+        <button type="button" onclick="sendPasswordResetEmail()" id="pwResetBtn" style="width:100%;padding:12px 18px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Email senden</button>
+    </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen" class="app-screen">
+    <div class="app-fixed-top">
+        <div class="app-header">
+            <div class="app-header-left"><h1>Fliegengitter</h1><span class="header-user" id="headerUser"></span></div>
+            <button class="logout-btn" onclick="doLogout()">Abmelden</button>
+        </div>
+        <div class="tab-bar">
+            <button class="tab-item active" data-tab="board" onclick="switchTab('board')" style="display:flex;align-items:center;gap:5px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Bestell.</button>
+            <button class="tab-item tab-drafts" data-tab="drafts" onclick="switchTab('drafts')" style="display:flex;align-items:center;gap:5px;position:relative"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Entwürfe<span id="draftsBadge" style="display:none;position:absolute;top:-4px;right:-2px;background:#d97706;color:white;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 5px;border:2px solid white;box-sizing:content-box"></span></button>
+            <button class="tab-item" data-tab="neu" onclick="switchTab('neu')" style="display:flex;align-items:center;gap:5px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Neu</button>
+            <button class="tab-item" onclick="toggleMenu()" style="display:flex;align-items:center;gap:5px;margin-left:auto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg> Menü</button>
+        </div>
+        <div id="boardFixedArea" style="background:var(--bg);padding:10px 10px 0;max-width:520px;margin:0 auto;width:100%">
+            <div class="search-bar">
+                <span class="search-icon" style="color:var(--text-muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                <input type="text" id="boardSearch" placeholder="Suche nach Name, Telefon..."
+                    onfocus="openSearchOverlay()"
+                    onclick="openSearchOverlay()"
+                    readonly
+                    style="cursor:pointer">
+                <button class="search-clear" id="searchClear" onclick="document.getElementById('boardSearch').value='';renderBoardCards()" style="display:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div id="filialeFilter" style="display:none;margin-bottom:6px">
+                <select id="filialeSelect" onchange="renderBoardCards()" style="width:100%;padding:8px 12px;font-size:13px;font-weight:600;border:2px solid var(--primary);border-radius:var(--radius-sm);font-family:inherit;color:var(--primary);background:var(--card)">
+                    <option value="">Alle Filialen</option>
+                </select>
+            </div>
+            <!-- v1.18.12: Produktion-Statistik Banner -->
+            <div id="productionBanner" style="display:none"></div>
+            <div class="board-columns" id="boardColumns"></div>
+        </div>
+    </div>
+
+
+<!-- SLIDE MENU -->
+<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+<div class="slide-menu" id="slideMenu">
+    <div class="menu-header">
+        <h2>Menü</h2>
+        <button class="menu-close" onclick="closeMenu()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="menu-body">
+        <div class="menu-section">Produktion</div>
+        <button class="menu-item" onclick="menuNav('rechner')" data-tab="rechner">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16"/><path d="M10 4v16"/></svg></div>
+            Schnittliste
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+
+        <div class="menu-section">Lager</div>
+        <button class="menu-item" onclick="menuNav('lager')" data-tab="lager">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+            Bestandsübersicht
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+        <button class="menu-item" onclick="menuNav('wareneingang')" data-tab="wareneingang">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+            Wareneingang
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+        <button class="menu-item" onclick="menuNav('inventur')" data-tab="inventur">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="m9 14 2 2 4-4"/></svg></div>
+            Inventur
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+        <button class="menu-item" onclick="menuNav('materialien')" data-tab="materialien">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35z"/><path d="M6 18h12"/><path d="M6 14h12"/></svg></div>
+            Material verwalten
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+
+        <div class="menu-section">Auswertung</div>
+        <button class="menu-item" onclick="menuNav('dashboard')" data-tab="dashboard">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+            Statistik
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+
+
+        <div class="menu-section">Einstellungen</div>
+        <button class="menu-item" onclick="menuNav('settings')" data-tab="settings">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+            Einstellungen & Mitarbeiter
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
+
+        <!-- Sprache-Toggle (v1.18.0) - sichtbar für alle -->
+        <div class="menu-section">Sprache / Dil</div>
+        <div style="padding:8px 16px;display:flex;gap:6px">
+            <button id="langBtnDe" onclick="setLanguage('de')" style="flex:1;padding:9px 8px;font-size:13px;font-weight:600;border:2px solid var(--border);border-radius:8px;background:var(--card);color:var(--text-secondary);cursor:pointer;font-family:inherit">🇩🇪 Deutsch</button>
+            <button id="langBtnTr" onclick="setLanguage('tr')" style="flex:1;padding:9px 8px;font-size:13px;font-weight:600;border:2px solid var(--border);border-radius:8px;background:var(--card);color:var(--text-secondary);cursor:pointer;font-family:inherit">🇹🇷 Türkçe</button>
+        </div>
+    </div>
+    <div class="menu-footer" id="menuVersion">Fliegengitter App</div>
+</div>
+
+    <!-- SCHNITTLISTE -->
+    <div id="tab-rechner" class="tab-content">
+        <div class="container">
+            <!-- Quick-Eingabe (v1.15.0-p7): nur sichtbar wenn KEINE Bestellung geladen -->
+            <div class="card" id="rechnerQuickInput" style="padding:10px 12px">
+                <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">
+                    <div style="flex:1;min-width:80px"><div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-bottom:2px">BREITE</div><input type="number" id="breite" value="100" step="0.1" oninput="renderAll()" style="width:100%;padding:8px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:var(--card);box-sizing:border-box"></div>
+                    <div style="font-size:14px;color:var(--text-muted);padding-bottom:8px">×</div>
+                    <div style="flex:1;min-width:80px"><div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-bottom:2px">HÖHE</div><input type="number" id="hoehe" value="200" step="0.1" oninput="renderAll()" style="width:100%;padding:8px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:var(--card);box-sizing:border-box"></div>
+                    <div style="flex-shrink:0;width:55px"><div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-bottom:2px">STK</div><input type="number" id="stueckzahl" value="1" min="1" oninput="renderAll()" style="width:100%;padding:8px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:var(--card);box-sizing:border-box"></div>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer;padding-bottom:8px">
+                        <input type="checkbox" id="rechnerDoppeltuer" onchange="renderAll()" style="width:18px;height:18px;accent-color:var(--primary)"> DT
+                    </label>
+                </div>
+                <div class="color-row" style="margin-top:8px;display:flex;gap:6px">
+                    <button class="color-btn btn-antrazit active" onclick="selectColor(this,'Antrazit','#4a4a4a','#ccc')" style="flex:1;padding:6px;font-size:12px">Antrazit</button>
+                    <button class="color-btn btn-weiss" onclick="selectColor(this,'Weiß','#e0e0e0','#444')" style="flex:1;padding:6px;font-size:12px">Weiß</button>
+                    <button class="color-btn btn-braun" onclick="selectColor(this,'Braun','#8B4513','#fac775')" style="flex:1;padding:6px;font-size:12px">Braun</button>
+                </div>
+            </div>
+            <div class="card" id="summaryCard" style="padding:0;overflow:hidden;">
+                <div class="summary" id="summaryContainer" style="position:relative;">
+                    <div id="summarySlides" style="display:flex;transition:transform 0.3s ease;"></div>
+                    <div id="summaryNav" style="display:none;position:absolute;top:50%;right:8px;transform:translateY(-50%);z-index:5;">
+                        <button onclick="nextSummarySlide()" aria-label="Nächste" style="background:rgba(255,255,255,0.92);border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.25);color:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700">›</button>
+                    </div>
+                    <div id="summaryNavLeft" style="display:none;position:absolute;top:50%;left:8px;transform:translateY(-50%);z-index:5;">
+                        <button onclick="prevSummarySlide()" aria-label="Vorherige" style="background:rgba(255,255,255,0.92);border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.25);color:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700">‹</button>
+                    </div>
+                    <div id="summaryDots" style="display:none;position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;"></div>
+                </div>
+            </div>
+            <div id="rechnerBwareAlert" style="display:none;background:var(--amber-bg);border:2px solid var(--amber-border);border-radius:var(--radius);padding:14px;margin-bottom:10px;font-size:13px;color:#78350f"></div>
+            <div class="card" id="rechnerBemerkung" style="display:none">
+                <div class="card-label"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span> Bemerkung</div>
+                <div id="rechnerBemerkungText" style="font-size:14px;color:var(--text-secondary);font-style:italic;line-height:1.5"></div>
+            </div>
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0">Schnittmaße</span>
+                    <button class="reset-btn" onclick="resetAbzuege()">zurücksetzen</button>
+                </div>
+                <table><thead><tr><th>Material</th><th style="text-align:center">Bestellm.</th><th style="text-align:center">Abzug</th><th style="text-align:center">Stk</th><th style="text-align:right">Maß</th></tr></thead><tbody id="matTable"></tbody></table>
+            </div>
+            <div class="card">
+                <div class="card-label">Abstand-Berechnung</div>
+                <div class="tuel-info" id="tuelInfo"></div>
+                <div class="abstand-grid" id="abstandGrid"></div>
+            </div>
+            <div class="card">
+                <div class="card-label"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span> Etikett drucken</div>
+                <div id="etikettPreview" style="background:#f8f8f8;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:10px;text-align:center">
+                <canvas id="etikettCanvas" style="max-width:100%;border:1px solid #ddd;background:white"></canvas>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <button onclick="druckenDirekt()" style="width:100%;padding:14px;background:#16a34a;color:white;border:none;border-radius:var(--radius-sm);font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        Drucken
+                    </button>
+                    <div style="display:flex;gap:8px">
+                        <button onclick="druckenShare()" style="flex:1;padding:10px;background:#374151;color:white;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            Teilen
+                        </button>
+                        <button onclick="druckenDownload()" style="flex:1;padding:10px;background:var(--primary);color:white;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Bild speichern
+                        </button>
+                    </div>
+                    <button id="rechnerAbholbereitBtn" onclick="rechnerToAbholbereit()" style="display:none;width:100%;padding:13px;background:#16a34a;color:white;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Direkt → Abholbereit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOARD -->
+    <div id="tab-board" class="tab-content active">
+        <div class="container" style="padding-top:6px">
+            <div id="bwareQuickAdd" style="display:none">
+                <div class="card" style="border:2px solid #8B4513">
+                    <div class="card-label" style="color:#8B4513">B-Ware eintragen</div>
+                    <div class="input-row mb-12">
+                        <div class="field"><label>Breite (cm)</label><input type="number" id="bwareBreite" placeholder="z.B. 100" oninput="calcBwarePreview()"></div>
+                        <div class="field"><label>Höhe (cm)</label><input type="number" id="bwareHoehe" placeholder="z.B. 200" oninput="calcBwarePreview()"></div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:10px">
+                        <div class="field" style="flex:2"><label>Farbe</label>
+                            <select id="bwareFarbe" style="font-size:13px;padding:9px 8px;width:100%">
+                                <option value="Antrazit">Antrazit</option>
+                                <option value="Weiß">Weiß</option>
+                                <option value="Braun">Braun</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="bwarePreview" style="display:none;padding:10px;background:var(--border-light);border-radius:8px;margin-bottom:10px;font-size:13px"></div>
+                    <div class="field mb-12"><label>Bemerkung</label><input type="text" id="bwareBemerkung" placeholder="Optional..."></div>
+                    <div style="display:flex;gap:8px">
+                        <button class="action-btn primary" onclick="saveBWare()" style="flex:1"><span style="display:inline-flex;margin-right:3px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 7.97l3.418-3.421"/><path d="M17 3.414 13.582 7 17 10.586"/><path d="m9.5 4.39 3.918-1.247 1.247 3.918"/></svg></span> B-Ware speichern</button>
+                        <button class="action-btn secondary" onclick="document.getElementById('bwareQuickAdd').style.display='none'" style="flex:0">Abbrechen</button>
+                    </div>
+                </div>
+            </div>
+            <div id="boardCards"></div>
+        </div>
+    </div>
+
+    <!-- ENTWÜRFE (v1.15.0) -->
+    <div id="tab-drafts" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <span class="card-label" style="margin-bottom:0;color:#d97706">📝 Entwürfe</span>
+                    <button class="action-btn primary" onclick="switchTab('neu')" style="padding:6px 14px;font-size:12px;background:#f59e0b">+ Neuer Entwurf</button>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
+                    Preisanfragen ohne fixe Bestellung. Mit Frist werden sie nach Ablauf automatisch gelöscht. Beim Umwandeln zur Bestellung wird eine richtige Bestellnummer vergeben.
+                </div>
+                <div id="draftsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEU -->
+    <div id="tab-neu" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label">Neue Bestellung</div>
+                <div class="input-row mb-12">
+                    <div class="field"><label>Vorname</label><input type="text" id="newVorname" placeholder="Vorname"></div>
+                    <div class="field"><label>Nachname</label><input type="text" id="newNachname" placeholder="Nachname"></div>
+                </div>
+                <div class="field mb-12"><label>Telefon</label>
+                    <div class="tel-row">
+                        <select id="newVorwahl" class="tel-vorwahl">
+                            <option value="+43" selected>+43</option>
+                            <option value="+49">+49</option>
+                            <option value="+41">+41</option>
+                            <option value="+90">+90</option>
+                            <option value="+387">+387</option>
+                            <option value="+381">+381</option>
+                            <option value="+385">+385</option>
+                            <option value="+48">+48</option>
+                            <option value="+40">+40</option>
+                            <option value="+36">+36</option>
+                            <option value="+421">+421</option>
+                            <option value="+420">+420</option>
+                            <option value="+39">+39</option>
+                            <option value="+44">+44</option>
+                        </select>
+                        <input type="tel" id="newTelNummer" class="tel-nummer" placeholder="660 1234567" oninput="autoFormatPhone(this, 'newVorwahl')">
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-label">Artikel</div>
+                <div id="newMeasures"></div>
+                <button class="add-measure-btn" onclick="addMeasureField()">＋ Artikel hinzufügen</button>
+            </div>
+            <div class="card">
+                <div class="card-label">Preisübersicht</div>
+                <div id="newPriceLines"></div>
+                <div class="price-summary" id="newPriceSummary"></div>
+                <div class="input-row mt-8">
+                    <div class="field"><label>Anzahlung €</label><input type="number" id="newAnzahlung" inputmode="decimal" value="0" oninput="calcNewPrice()"></div>
+                    <div class="field"><label>Restbetrag €</label><input type="number" id="newRestbetrag" value="0" oninput="calcNewPriceFromRest()"></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="input-row mb-12">
+                    <div class="field"><label>Bestelldatum</label><input type="date" id="newBestelldatum"></div>
+                    <div class="field"><label>Fristdatum</label><input type="date" id="newFrist"><div id="fristVorschlagHint" style="display:none"></div></div>
+                </div>
+                <div class="field"><label>Bemerkung</label><textarea id="newBemerkung" class="full-input" placeholder="Optionale Bemerkung..." style="margin-bottom:0"></textarea></div>
+                <div class="field" id="newFilialeField" style="display:none;margin-top:8px"><label>Filiale</label>
+                    <select id="newFilialeSelect" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                        <option value="">— Filiale wählen —</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Entwurf-Aktionsleiste (nur sichtbar im Entwurf-Bearbeiten-Modus) (v1.15.0) -->
+            <div id="draftActionsBar" style="display:none;margin-bottom:10px;padding:10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px">
+                <div style="font-size:12px;color:#78350f;margin-bottom:8px;font-weight:600">📝 Du bearbeitest einen Entwurf</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                    <button class="action-btn" onclick="saveAsDraft()" style="flex:1;background:#f59e0b;color:white;font-size:13px;padding:10px">Entwurf aktualisieren</button>
+                    <button class="action-btn" onclick="convertDraftToOrder()" style="flex:1;background:var(--green);color:white;font-size:13px;padding:10px">Bestellen ✓</button>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button class="action-btn" onclick="exitDraftEdit()" style="flex:1;background:var(--border-light);color:var(--text-secondary);font-size:12px;padding:8px">Abbrechen</button>
+                    <button class="action-btn" onclick="deleteCurrentDraft()" style="flex:1;background:var(--red);color:white;font-size:12px;padding:8px">🗑 Entwurf löschen</button>
+                </div>
+                <div style="font-size:10px;color:#78350f;margin-top:8px;line-height:1.4">
+                    <strong>Bestellen ✓</strong> = Telefon ist Pflicht. Eine richtige Bestellnummer wird vergeben, der Entwurf gelöscht.
+                </div>
+            </div>
+
+            <div id="bottomActionsBar" style="display:flex;gap:8px;margin-bottom:20px">
+                <button class="action-btn" id="saveDraftBtn" onclick="saveAsDraft()" style="flex:1;background:#f59e0b;color:white">Als Entwurf speichern</button>
+                <button class="action-btn primary" onclick="saveNewOrder()" style="flex:1">Bestellung speichern</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0">Statistik</span>
+                    <select id="dashPeriod" onchange="renderDashboard()" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:8px;font-family:inherit">
+                        <option value="week">Diese Woche</option>
+                        <option value="month" selected>Diesen Monat</option>
+                        <option value="year">Dieses Jahr</option>
+                        <option value="all">Gesamt</option>
+                    </select>
+                </div>
+            </div>
+            <div id="dashContent"></div>
+        </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="tab-settings" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label">Einstellungen</div>
+                <div class="setting-row">
+                    <div><div class="setting-label">m²-Preis (€)</div><div class="setting-desc">Preis pro Quadratmeter</div></div>
+                    <input type="number" class="setting-input" id="sqmPrice" inputmode="decimal" value="25" step="0.5" oninput="saveSqmPrice();calcNewPrice()">
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label"><span style="display:inline-flex;vertical-align:middle;margin-right:3px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/><path d="M12 2v20"/><circle cx="15.5" cy="12" r="0.7" fill="currentColor"/><circle cx="8.5" cy="12" r="0.7" fill="currentColor"/></svg></span> Doppeltür €/m²</div><div class="setting-desc">Preis für Doppeltür pro m²</div></div>
+                    <input type="number" class="setting-input" id="doppeltuerPriceInput" inputmode="decimal" class="setting-input-restricted" value="60" step="0.5" oninput="saveDoppeltuerPrice()">
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span> Benachrichtigungen</div><div class="setting-desc">Bei neuen Bestellungen benachrichtigen</div></div>
+                    <button class="logout-btn" id="pushToggleBtn" onclick="requestPushPermission()">Aktivieren</button>
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label">Spalten verwalten</div><div class="setting-desc">Board-Spalten hinzufügen/entfernen</div></div>
+                    <button class="logout-btn" onclick="manageColumns()">Bearbeiten</button>
+                </div>
+            </div>
+            <div class="card" id="notifyTextCard">
+                <div class="card-label"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span> Benachrichtigungstext</div>
+                <div class="edit-field"><label>WhatsApp-Nachricht</label>
+                    <textarea id="settingsNotifyText" class="full-input" style="min-height:80px;margin-bottom:0;text-align:left" oninput="saveNotifyText()" placeholder="Hallo {name}, Ihre Fliegengitter-Bestellung ist fertig..."></textarea>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:6px">{name} = Kundenname · {rest} = offener Betrag</div>
+            </div>
+
+            <div class="card" id="abzugSettingsCard">
+                <div class="card-label"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg></span> Schnittmaße (Abzüge)</div>
+                <div style="font-size:13px;color:var(--text-muted);padding:8px;line-height:1.5">Die Schnittmaße werden seit v1.12 direkt am jeweiligen Material gepflegt. Öffne dazu in der Material-Verwaltung das gewünschte Material und bearbeite die Liste der Schnittmaße.</div>
+            </div>
+
+            <!-- Firmendaten (v1.16.2) - für PDF-Druck und Etikett -->
+            <div class="card" id="companyDataCard">
+                <div class="card-label">🏢 Firmendaten</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">Diese Daten werden auf PDF-Bestellungen und Etiketten angezeigt.</div>
+
+                <div class="edit-field"><label>Firmenname *</label>
+                    <input type="text" id="companyName" class="full-input" oninput="saveCompanyDataDebounced()" placeholder="z.B. Bella Home GmbH">
+                </div>
+                <div class="edit-field"><label>Inhaber / Geschäftsführer</label>
+                    <input type="text" id="companyOwner" class="full-input" oninput="saveCompanyDataDebounced()" placeholder="optional">
+                </div>
+                <div class="edit-field"><label>Adresse (Straße, PLZ, Ort)</label>
+                    <input type="text" id="companyAddress" class="full-input" oninput="saveCompanyDataDebounced()" placeholder="z.B. Mariahilferstraße 123, 1060 Wien">
+                </div>
+                <div class="input-row">
+                    <div class="field"><label>Telefon</label>
+                        <input type="text" id="companyPhone" oninput="saveCompanyDataDebounced()" placeholder="+43 ...">
+                    </div>
+                    <div class="field"><label>E-Mail</label>
+                        <input type="email" id="companyEmail" oninput="saveCompanyDataDebounced()" placeholder="info@...">
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="field"><label>Website</label>
+                        <input type="text" id="companyWebsite" oninput="saveCompanyDataDebounced()" placeholder="www. ...">
+                    </div>
+                    <div class="field"><label>IBAN</label>
+                        <input type="text" id="companyIban" oninput="saveCompanyDataDebounced()" placeholder="AT...">
+                    </div>
+                </div>
+
+                <!-- Logo Upload -->
+                <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-light)">
+                    <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px">Firmenlogo</div>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <div id="companyLogoPreview" style="width:80px;height:80px;border:2px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg-light);color:var(--text-muted);font-size:11px;text-align:center;overflow:hidden">
+                            Kein Logo
+                        </div>
+                        <div style="flex:1;min-width:140px">
+                            <button class="action-btn" onclick="document.getElementById('companyLogoInput').click()" style="font-size:13px;padding:8px 14px;background:var(--primary);color:white;width:100%">📤 Logo hochladen</button>
+                            <button class="action-btn" id="companyLogoRemoveBtn" onclick="removeCompanyLogo()" style="font-size:11px;padding:6px;background:var(--border-light);color:var(--text-secondary);width:100%;margin-top:6px;display:none">Logo entfernen</button>
+                            <input type="file" id="companyLogoInput" accept="image/*" style="display:none" onchange="onCompanyLogoSelected(this)">
+                            <div style="font-size:10px;color:var(--text-muted);margin-top:4px;line-height:1.4">PNG, JPG. Wird automatisch verkleinert.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="font-size:11px;color:var(--text-muted);margin-top:10px;padding:6px;background:var(--bg-light);border-radius:6px">
+                    💾 Wird automatisch gespeichert
+                </div>
+            </div>
+            <div class="card" id="columnsManager" style="display:none">
+                <div class="card-label">Board-Spalten</div>
+                <div id="columnsListEdit"></div>
+                <div class="input-row mt-8">
+                    <input type="text" id="newColName" class="full-input" placeholder="Neue Spalte..." style="margin-bottom:0">
+                    <button class="action-btn primary" onclick="addColumn()" style="padding:10px">Hinzufügen</button>
+                </div>
+            </div>
+            <div class="card" id="filialenCard">
+                <div class="card-label-row" style="flex-wrap:wrap;gap:8px">
+                    <span class="card-label" style="margin-bottom:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Filialen</span>
+                    <button class="action-btn primary" onclick="openFilialeForm()" style="padding:6px 14px;font-size:12px">+ Neue Filiale</button>
+                </div>
+                <div id="filialenList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                <div id="filialeAssignSection" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)">
+                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Bestellungen ohne Filiale zuweisen:</div>
+                    <div style="display:flex;gap:6px">
+                        <select id="assignFilialeSelect" style="flex:1;padding:8px;font-size:13px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
+                        <button class="action-btn primary" onclick="assignAllOrders()" style="padding:8px 14px;font-size:12px;white-space:nowrap">Zuweisen</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modell-System Stammdaten (ab v1.13.0) -->
+            <div id="stammdatenBlock" style="display:none">
+                <div class="card" id="colorsCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Farb-Katalog</span>
+                        <button class="action-btn primary" onclick="openColorForm()" style="padding:6px 14px;font-size:12px">+ Neue Farbe</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Globale Profil-Farben für Modelle und Materialien.</div>
+                    <div id="colorsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                </div>
+
+                <div class="card" id="plisseeColorsCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Plissee-Farben</span>
+                        <button class="action-btn primary" onclick="openPlisseeColorForm()" style="padding:6px 14px;font-size:12px">+ Neue Plissee-Farbe</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Plissee-Stoff-Farben (z.B. Grün, Lila). Werden bei Variante "Plissee" zur Auswahl angeboten. Inaktive sind ausgeblendet.</div>
+                    <div id="plisseeColorsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                </div>
+
+                <div class="card" id="variantsCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Varianten</span>
+                        <button class="action-btn primary" onclick="openVariantForm()" style="padding:6px 14px;font-size:12px">+ Neue Variante</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Wiederverwendbare Auswahl-Optionen wie Türart, Plissee, Stoffart.</div>
+                    <div id="variantsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                </div>
+
+                <div class="card" id="modelsCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Modelle</span>
+                        <button class="action-btn primary" onclick="openModelForm()" style="padding:6px 14px;font-size:12px">+ Neues Modell</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Produktvarianten mit eigener Schnittliste, Preisen, Farben.</div>
+                    <div id="modelsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                </div>
+
+                <div class="card" id="migrationCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Migration auf Modell-System</span>
+                    </div>
+                    <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">
+                        Konvertiert die heutigen Stammdaten (Farben aus Materialien, Türart aus Bestellungen) und legt das Modell <strong>"Klassik"</strong> mit allen heutigen Materialien an. <strong>Vorher Backup ziehen!</strong>
+                    </div>
+                    <div id="migrationStatus" style="font-size:12px;margin-bottom:8px;padding:10px;background:var(--bg-light);border-radius:8px;line-height:1.6"></div>
+                    <div style="display:flex;gap:8px">
+                        <button class="action-btn" onclick="checkMigrationStatus()" style="background:var(--border-light);color:var(--text-secondary)">Status prüfen</button>
+                        <button class="action-btn primary" onclick="runMigration()">Migration starten</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-label" id="inviteSection"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Mitarbeiter einladen</div>
+                <div class="edit-field"><label>E-Mail</label><input type="email" id="inviteEmail" placeholder="name@beispiel.de"></div>
+                <div class="edit-field"><label>Passwort</label><input type="text" id="invitePassword" placeholder="Mindestens 6 Zeichen"></div>
+                <div class="edit-field"><label>Kurzname</label><input type="text" id="inviteKurzname" placeholder="z.B. Ali, Mehmet..."></div>
+                <div class="edit-field"><label>Rolle</label>
+                    <select id="inviteRole" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                        <option value="mitarbeiter">Mitarbeiter</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="edit-field"><label>Filiale</label>
+                    <select id="inviteFiliale" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                        <option value="">— Filiale wählen —</option>
+                    </select>
+                </div>
+                <button class="action-btn primary" onclick="inviteUser()" style="margin-top:4px">Mitarbeiter anlegen</button>
+                <div id="inviteMsg" style="font-size:13px;text-align:center;margin-top:10px;min-height:18px"></div>
+            </div>
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Mitglieder</span>
+                    <button class="reset-btn" onclick="loadMembers()" style="font-size:12px">↻ Aktualisieren</button>
+                </div>
+                <div id="membersList"><div class="loading" style="padding:12px">Wird geladen...</div></div>
+            </div>
+            <div class="card" id="backupCard" style="display:none">
+                <div class="card-label">Datensicherung</div>
+                <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Alle Bestellungen, Materialien und Einstellungen als JSON-Datei sichern.</div>
+                <div id="backupInfo" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <button class="action-btn primary" onclick="downloadBackup()" style="display:flex;align-items:center;justify-content:center;gap:6px">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Backup herunterladen
+                    </button>
+                    <label class="action-btn secondary" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-align:center">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Backup wiederherstellen
+                        <input type="file" accept=".json" onchange="restoreBackup(this)" style="display:none">
+                    </label>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- MATERIALIEN -->
+    <div id="tab-materialien" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label-row" style="flex-wrap:wrap;gap:8px">
+                    <span class="card-label" style="margin-bottom:0">Materialien</span>
+                    <button class="action-btn primary" onclick="openMaterialForm()" style="padding:6px 14px;font-size:12px;white-space:nowrap">+ Neues Material</button>
+                </div>
+                <div id="materialList"><div class="loading" style="padding:12px">Wird geladen...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WARENEINGANG -->
+    <div id="tab-wareneingang" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label">Wareneingang buchen</div>
+                <div class="edit-field"><label>Material</label>
+                    <select id="weMatId" onchange="onWeMaterialChange()" style="width:100%;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                        <option value="">— Material wählen —</option>
+                    </select>
+                </div>
+                <div id="weColorField" style="display:none" class="edit-field"><label>Farbe</label>
+                    <select id="weColor" style="width:100%;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                        <option value="Antrazit">Antrazit</option>
+                        <option value="Weiß">Weiß</option>
+                        <option value="Braun">Braun</option>
+                    </select>
+                </div>
+                <div id="weFieldsStange" style="display:none">
+                    <div class="input-row mb-12">
+                        <div class="field"><label>Anzahl</label><input type="number" id="weAnzahl" min="1" value="1"></div>
+                        <div class="field"><label id="weLengthLabel">Stangenlänge (m)</label><input type="number" id="weLaenge" step="0.1"></div>
+                    </div>
+                </div>
+                <div id="weFieldsNetz" style="display:none">
+                    <div class="input-row mb-12">
+                        <div class="field"><label>Anzahl Rollen</label><input type="number" id="weNetzAnzahl" min="1" value="1"></div>
+                        <div class="field"><label>Faltenanzahl/Rolle</label><input type="number" id="weNetzFalten" min="1"></div>
+                    </div>
+                    <div class="edit-field"><label>Höhe/Länge (cm)</label>
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <select id="weNetzHoehe" onchange="document.getElementById('weNetzHoeheCustom').value=this.value" style="flex:1;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
+                            <input type="number" id="weNetzHoeheCustom" placeholder="oder frei eingeben" step="0.5" style="flex:1;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                        </div>
+                    </div>
+                </div>
+                <div id="weFieldsRolle" style="display:none">
+                    <div class="input-row mb-12">
+                        <div class="field"><label>Anzahl Rollen</label><input type="number" id="weRolleAnzahl" min="1" value="1"></div>
+                        <div class="field"><label>Meter/Rolle</label><input type="number" id="weRolleMeter" step="0.1"></div>
+                    </div>
+                </div>
+                <div id="weFieldsFlaeche" style="display:none">
+                    <div class="input-row mb-12">
+                        <div class="field"><label>Anzahl Rollen</label><input type="number" id="weFlaecheAnzahl" min="1" value="1"></div>
+                        <div class="field"><label>Meter/Rolle</label><input type="number" id="weFlaecheMeter" step="0.1"></div>
+                    </div>
+                </div>
+                <div id="weFieldsStueck" style="display:none">
+                    <div class="edit-field"><label>Anzahl</label><input type="number" id="weStueckAnzahl" min="1" value="1"></div>
+                </div>
+                <div class="input-row mb-12">
+                    <div class="field"><label>Datum</label><input type="date" id="weDatum"></div>
+                    <div class="field"><label>Preis € (optional)</label><input type="number" id="wePreis" step="0.01" placeholder="Gesamt"></div>
+                </div>
+                <div class="edit-field"><label>Lieferant (optional)</label><input type="text" id="weLieferant" placeholder="z.B. Großhändler"></div>
+                <div class="edit-field"><label>Bemerkung (optional)</label><input type="text" id="weBemerkung" placeholder=""></div>
+                <button class="action-btn primary" onclick="saveWareneingang()" style="margin-top:4px">Wareneingang buchen</button>
+            </div>
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0">Letzte Eingänge</span>
+                    <button class="reset-btn" onclick="loadWareneingaenge()" style="font-size:12px">↻</button>
+                </div>
+                <div id="weList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Noch keine Eingänge.</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LAGER (Bestandsübersicht) -->
+    <div id="tab-lager" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0">Bestandsübersicht</span>
+                    <div style="display:flex;gap:6px">
+                        <button class="reset-btn" onclick="exportBestellliste('pdf')" style="font-size:12px;color:var(--red)">PDF</button>
+                        <button class="reset-btn" onclick="exportBestellliste('csv')" style="font-size:12px;color:var(--primary)">CSV</button>
+                        <button class="reset-btn" onclick="loadBestandsuebersicht()" style="font-size:12px">↻</button>
+                    </div>
+                </div>
+            </div>
+            <div id="lagerContent"><div class="loading" style="padding:12px">Wird geladen...</div></div>
+        </div>
+    </div>
+
+    <!-- INVENTUR -->
+    <div id="tab-inventur" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label">Inventur durchführen</div>
+                <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Trage den aktuellen Ist-Bestand ein. Die Differenz zum Soll-Bestand wird automatisch berechnet.</div>
+                <div id="inventurForm"><div class="loading" style="padding:12px">Wird geladen...</div></div>
+                <button class="action-btn primary" onclick="saveInventur()" style="margin-top:12px">Inventur speichern</button>
+            </div>
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0">Letzte Inventuren</span>
+                </div>
+                <div id="inventurHistory"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Noch keine Inventur durchgeführt.</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-overlay" id="orderModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal-sheet">
+        <div style="padding:8px 0 0;text-align:center"><div style="width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto"></div></div>
+        <div class="modal-sticky-header" id="modalStickyHeader"></div>
+        <div class="modal-scroll-content" id="modalContent"></div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/01-helpers.js"></script>
+<script src="js/02-i18n.js"></script>
+<script>
+// ═══ FIREBASE ═══
+firebase.initializeApp({
+    apiKey: "AIzaSyAWnVmmesRYiQmXIQBu-zIR73fsr9BkYyc",
+    authDomain: "fliegengitter-3486c.firebaseapp.com",
+    projectId: "fliegengitter-3486c",
+    storageBucket: "fliegengitter-3486c.firebasestorage.app",
+    messagingSenderId: "816787100278",
+    appId: "1:816787100278:web:79bce66d6900b827524557"
+});
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ═══ TOAST & CONFIRM ═══
+
+// ═══ Helpers (showToast, showConfirm) sind in js/01-helpers.js ═══
+// ═══ Sprachsystem (TRANSLATIONS_TR, setLanguage, t, ...) ist in js/02-i18n.js ═══
+
+let currentUser = null;
+// v1.18.4-phase3: Auth-State-Variablen vorausdeklariert (werden in 03-auth.js gefüllt)
+// Default-Werte verhindern ReferenceError wenn renderAll() vor dem Laden von 03-auth.js läuft
+let currentUserRole = 'mitarbeiter';
+let currentUserPerms = {};
+let boardColumns = ['Reparatur', 'Warteliste', 'Bestellung', 'In Produktion', 'Abholbereit', 'Abgeholt', 'B-Ware', 'Gelöscht'];
+let activeColumn = 'Bestellung';
+let filialen = [];
+let currentUserFiliale = '';
+let currentUserFilialeId = '';
+let rechnerFiliale = '';
+let rechnerOrderId = '';
+let cachedMaterials = [];
+let cachedColors = [];
+let cachedPlisseeColors = []; // v1.16.5 — Plissee-Farben (eigene Stammdaten)
+let cachedVariants = [];
+let cachedModels = [];
+let cachedCompanyData = null; // v1.16.2 — Firmendaten für PDF/Etikett
+
+async function loadColors() {
+    try {
+        const snap = await db.collection('colors').orderBy('sortOrder').get();
+        cachedColors = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { console.error('loadColors:', e); }
+}
+
+// ═══ PLISSEE-FARBEN (v1.16.5) ═══
+async function loadPlisseeColors() {
+    try {
+        const snap = await db.collection('plissee_colors').orderBy('sortOrder').get();
+        cachedPlisseeColors = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+        console.error('loadPlisseeColors:', e);
+        cachedPlisseeColors = [];
+    }
+}
+
+function getPlisseeColor(id) {
+    return cachedPlisseeColors.find(c => c.id === id) || null;
+}
+
+async function loadVariants() {
+    try {
+        const snap = await db.collection('variants').orderBy('sortOrder').get();
+        cachedVariants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { console.error('loadVariants:', e); }
+}
+
+async function loadModels() {
+    try {
+        const snap = await db.collection('models').orderBy('sortOrder').get();
+        cachedModels = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Wenn "Neue Bestellung"-Tab geöffnet ist, neu rendern damit Modell-Dropdown sichtbar wird
+        if (typeof renderNewForm === 'function' && document.getElementById('tab-neu')?.classList.contains('active')) {
+            renderNewForm();
+        }
+    } catch(e) { console.error('loadModels:', e); }
+}
+
+// ═══ FIRMENDATEN (v1.16.2) ═══
+async function loadCompanyData() {
+    try {
+        const doc = await db.collection('settings').doc('company').get();
+        cachedCompanyData = doc.exists ? doc.data() : {};
+    } catch(e) { console.error('loadCompanyData:', e); cachedCompanyData = {}; }
+}
+
+function fillCompanyDataForm() {
+    const d = cachedCompanyData || {};
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    set('companyName', d.name);
+    set('companyOwner', d.owner);
+    set('companyAddress', d.address);
+    set('companyPhone', d.phone);
+    set('companyEmail', d.email);
+    set('companyWebsite', d.website);
+    set('companyIban', d.iban);
+    // Logo-Vorschau
+    const preview = document.getElementById('companyLogoPreview');
+    const removeBtn = document.getElementById('companyLogoRemoveBtn');
+    if (preview) {
+        if (d.logoBase64) {
+            preview.innerHTML = `<img src="${d.logoBase64}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+            preview.style.borderStyle = 'solid';
+            if (removeBtn) removeBtn.style.display = '';
+        } else {
+            preview.innerHTML = 'Kein Logo';
+            preview.style.borderStyle = 'dashed';
+            if (removeBtn) removeBtn.style.display = 'none';
+        }
+    }
+}
+
+let _saveCompanyDataTimeout = null;
+function saveCompanyDataDebounced() {
+    if (_saveCompanyDataTimeout) clearTimeout(_saveCompanyDataTimeout);
+    _saveCompanyDataTimeout = setTimeout(saveCompanyData, 800);
+}
+
+async function saveCompanyData() {
+    const get = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const data = {
+        name: get('companyName'),
+        owner: get('companyOwner'),
+        address: get('companyAddress'),
+        phone: get('companyPhone'),
+        email: get('companyEmail'),
+        website: get('companyWebsite'),
+        iban: get('companyIban'),
+        logoBase64: cachedCompanyData?.logoBase64 || '',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: currentUser?.email || 'unknown'
+    };
+    try {
+        await db.collection('settings').doc('company').set(data, { merge: true });
+        cachedCompanyData = data;
+    } catch(e) {
+        showToast('Speichern fehlgeschlagen: ' + e.message, 'error');
+    }
+}
+
+// Logo: Bild auswählen → verkleinern → speichern
+function onCompanyLogoSelected(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        showToast('Bitte ein Bild auswählen.', 'warning'); return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const dataUrl = e.target.result;
+        // Bild verkleinern via Canvas
+        const img = new Image();
+        img.onload = async () => {
+            const maxDim = 300; // Max 300px breit/hoch — reicht für PDF und Etikett
+            let w = img.width, h = img.height;
+            if (w > h) {
+                if (w > maxDim) { h = h * (maxDim / w); w = maxDim; }
+            } else {
+                if (h > maxDim) { w = w * (maxDim / h); h = maxDim; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL('image/png');
+            // Größen-Check
+            if (compressed.length > 500_000) {
+                showToast('Logo zu groß auch nach Verkleinerung. Bitte ein anderes Bild wählen.', 'warning', 4000);
+                return;
+            }
+            // Cache aktualisieren und speichern
+            if (!cachedCompanyData) cachedCompanyData = {};
+            cachedCompanyData.logoBase64 = compressed;
+            try {
+                await db.collection('settings').doc('company').set({ logoBase64: compressed }, { merge: true });
+                fillCompanyDataForm();
+                showToast('Logo hochgeladen.', 'success');
+            } catch(err) {
+                showToast('Fehler: ' + err.message, 'error');
+            }
+        };
+        img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    // Input zurücksetzen damit man dasselbe Bild nochmal auswählen kann
+    input.value = '';
+}
+
+async function removeCompanyLogo() {
+    if (!cachedCompanyData) cachedCompanyData = {};
+    cachedCompanyData.logoBase64 = '';
+    try {
+        await db.collection('settings').doc('company').set({ logoBase64: '' }, { merge: true });
+        fillCompanyDataForm();
+        showToast('Logo entfernt.', 'success');
+    } catch(e) {
+        showToast('Fehler: ' + e.message, 'error');
+    }
+}
+
+// Lookup-Helper. Geben das Objekt zurück oder null.
+function getColor(id)   { return cachedColors.find(c => c.id === id) || null; }
+function getVariant(id) { return cachedVariants.find(v => v.id === id) || null; }
+
+// Helfer: prüft ob Cut-Bedingung mit Maß-Variants matched (v1.16.7)
+function cutConditionMatches(condition, measureVariants) {
+    if (!condition || !condition.variantId) return true; // keine Bedingung = immer aktiv
+    const actual = (measureVariants || {})[condition.variantId];
+    return actual === condition.optionId;
+}
+
+// Helfer: berechnet effektive Cut-Werte mit Overrides (v1.16.8)
+// Mergt Standard-Werte + alle matchenden Overrides. Letzter gewinnt bei Konflikt.
+function getEffectiveCutValues(cut, measureVariants) {
+    const eff = {
+        abzug: cut.abzug || 0,
+        stueck: cut.stueck || 1,
+        doppeltuerFaktor: cut.doppeltuerFaktor || 1
+    };
+    if (!Array.isArray(cut.overrides)) return eff;
+    cut.overrides.forEach(ov => {
+        if (!cutConditionMatches(ov.when, measureVariants)) return;
+        const v = ov.values || {};
+        if (v.abzug !== undefined && v.abzug !== null && v.abzug !== '') eff.abzug = parseFloat(v.abzug) || 0;
+        if (v.stueck !== undefined && v.stueck !== null && v.stueck !== '') eff.stueck = parseInt(v.stueck) || 1;
+        if (v.doppeltuerFaktor !== undefined && v.doppeltuerFaktor !== null && v.doppeltuerFaktor !== '') eff.doppeltuerFaktor = parseInt(v.doppeltuerFaktor) || 1;
+    });
+    return eff;
+}
+function getModel(id)   { return cachedModels.find(m => m.id === id) || null; }
+function getDefaultModel() { return cachedModels.find(m => m.default && m.active) || cachedModels[0] || null; }
+
+// Variante-Option finden
+function getVariantOption(variantId, optionId) {
+    const v = getVariant(variantId);
+    if (!v || !Array.isArray(v.options)) return null;
+    return v.options.find(o => o.id === optionId) || null;
+}
+
+// Generiert eine slug-id aus Namen für neue Doc-IDs (wie "Antrazit" → "antrazit")
+function slugifyId(name) {
+    return (name || '').toLowerCase()
+        .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+        .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0, 40) || 'id';
+}
+const BACKUP_COLLECTIONS = ['orders', 'members', 'settings', 'materials', 'inventory_in', 'inventory_out', 'inventory_check', 'filialen', 'colors', 'variants', 'models'];
+let orders = [];
+let drafts = [];
+let editMeasures = [];
+let summarySlides = [];
+let currentSlide = 0;
+const APP_VERSION = '1.18.23';
+const MAX_MASS_CM = 600; // Maximale Breite/Höhe in cm – Schutz vor Tippfehlern
+let unsubOrders = null;
+let sqmPrice = 25;
+let doppeltuerPrice = 60;
+let newOrderColor = '';
+let measureFields = [{ breite: '', hoehe: '', stueck: 1, farbe: '', preis: 0, modelId: '', variants: {} }];
+
+/**
+ * Prüft alle Maße in einer Liste auf Plausibilität.
+ * Gibt null zurück wenn alles OK, sonst eine Fehlermeldung.
+ * Erlaubt: 1 cm bis MAX_MASS_CM cm. Werte größer = vermutlich Tippfehler.
+ */
+function validateMeasures(measures) {
+    if (!Array.isArray(measures) || !measures.length) return 'Bitte mindestens ein Maß eingeben.';
+    for (let i = 0; i < measures.length; i++) {
+        const m = measures[i];
+        const b = parseFloat(m.breite) || 0;
+        const h = parseFloat(m.hoehe) || 0;
+        if (b <= 0 || h <= 0) {
+            return `Maß ${i+1}: Breite und Höhe müssen > 0 sein.`;
+        }
+        if (b > MAX_MASS_CM || h > MAX_MASS_CM) {
+            return `Maß ${i+1}: ${b}×${h} cm – ungültig!\n\nMaximale Breite/Höhe: ${MAX_MASS_CM} cm (${MAX_MASS_CM/100} m).\nBitte korrigieren – das ist vermutlich ein Tippfehler.`;
+        }
+        // v1.18.18: Auch Modell-Grenzen prüfen (measureLimits) wenn Modell zugewiesen
+        if (m.modelId && typeof getModel === 'function') {
+            const mdl = getModel(m.modelId);
+            const limits = mdl && mdl.measureLimits;
+            if (limits) {
+                if (b < (limits.minBreite || 0) || b > (limits.maxBreite || MAX_MASS_CM)
+                    || h < (limits.minHoehe || 0) || h > (limits.maxHoehe || MAX_MASS_CM)) {
+                    return `Maß ${i+1}: ${b}×${h} cm – außerhalb der Modell-Grenzen von "${mdl.name}".\n\nErlaubt: ${limits.minBreite}–${limits.maxBreite} × ${limits.minHoehe}–${limits.maxHoehe} cm.`;
+                }
+            }
+        }
+    }
+    return null;
+}
+
+
+
+const DEFAULTS = [
+    { name: 'Profil En', abzug: 4.0, stueck: 2, basis: 'breite' },
+    { name: 'Profil Boy', abzug: 7.6, stueck: 2, basis: 'hoehe' },
+    { name: 'Profil 2', abzug: 8.2, stueck: 1, basis: 'hoehe' },
+    { name: 'Tül', abzug: 4.0, stueck: 1, basis: 'hoehe' },
+    { name: 'Tül Adet', abzug: 0, stueck: 1, basis: 'tuel_adet' },
+    { name: 'Plastik', abzug: 4.4, stueck: 1, basis: 'hoehe' },
+    { name: 'Plastik Kisa', abzug: 8.8, stueck: 1, basis: 'hoehe' },
+    { name: 'Fitil', abzug: 6.0, stueck: 1, basis: 'hoehe' }
+];
+let abzuege = DEFAULTS.map(m => ({...m}));
+const TEILER = [3, 5, 7, 9];
+let selectedColor = 'Antrazit';
+let farbe = { name: 'Antrazit', bg: '#4a4a4a', color: '#ccc' };
+
+// Helper: get display name from email (part before @)
+function getUserName() {
+    if (!currentUser) return 'Unbekannt';
+    const email = currentUser.email || '';
+    const name = email.split('@')[0] || 'Unbekannt';
+    return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+// ═══ AUTH ═══
+let appInitialized = false;
+
+
+// ═══ SETTINGS ═══
+async function loadSettings() {
+    try {
+        const doc = await db.collection('settings').doc('global').get();
+        if (doc.exists) {
+            const d = doc.data();
+            if (d.sqmPrice) { sqmPrice = d.sqmPrice; document.getElementById('sqmPrice').value = sqmPrice; }
+            if (d.doppeltuerPrice) { doppeltuerPrice = d.doppeltuerPrice; const dEl=document.getElementById('doppeltuerPriceInput'); if(dEl) dEl.value=doppeltuerPrice; }
+            if (d.notifyText) { const el=document.getElementById('settingsNotifyText'); if(el) el.value=d.notifyText; }
+            if (d.abzuege && d.abzuege.length) { abzuege=d.abzuege.map(m=>({...m})); }
+            if (d.columns && d.columns.length) {
+                boardColumns = d.columns;
+                // Auto-add Gelöscht if missing
+                if (boardColumns.includes('Archiviert')) {
+                    boardColumns = boardColumns.map(c => c === 'Archiviert' ? 'Abgeholt' : c);
+                    saveColumns();
+                    // Migrate existing orders
+                    db.collection('orders').where('column','==','Archiviert').get().then(snap => {
+                        snap.forEach(d => d.ref.update({column:'Abgeholt'}));
+                    });
+                }
+                if (!boardColumns.includes('Warteliste')) {
+                    boardColumns.unshift('Warteliste');
+                    saveColumns();
+                }
+                if (!boardColumns.includes('Reparatur')) {
+                    // Reparatur immer ganz links
+                    boardColumns.unshift('Reparatur');
+                    saveColumns();
+                }
+                if (!boardColumns.includes('B-Ware')) {
+                    const gIdx = boardColumns.indexOf('Gelöscht');
+                    if (gIdx>=0) boardColumns.splice(gIdx, 0, 'B-Ware');
+                    else boardColumns.push('B-Ware');
+                    saveColumns();
+                }
+                if (!boardColumns.includes('Gelöscht')) {
+                    boardColumns.push('Gelöscht');
+                    saveColumns();
+                }
+            }
+        }
+    } catch(e) { console.log('Settings load:', e); }
+    renderBoardColumns();
+}
+function saveSqmPrice() {
+    sqmPrice = parseFloat(document.getElementById('sqmPrice').value) || 0;
+    db.collection('settings').doc('global').set({ sqmPrice, columns: boardColumns }, { merge: true }).catch(console.error);
+}
+function saveColumns() {
+    db.collection('settings').doc('global').set({ sqmPrice, columns: boardColumns }, { merge: true }).catch(console.error);
+}
+function saveNotifyText() {
+    const text = document.getElementById('settingsNotifyText').value;
+    db.collection('settings').doc('global').set({ notifyText: text }, { merge: true }).catch(console.error);
+}
+
+function saveDoppeltuerPrice() {
+    doppeltuerPrice = parseFloat(document.getElementById('doppeltuerPriceInput').value) || 60;
+    db.collection('settings').doc('global').set({ doppeltuerPrice }, { merge: true }).catch(console.error);
+}
+
+
+// ═══ SLIDE MENU ═══
+function toggleMenu() {
+    document.getElementById('menuOverlay').classList.toggle('active');
+    document.getElementById('slideMenu').classList.toggle('active');
+    // v1.18.0: Sprache-Knopf-Style aktualisieren
+    const deBtn = document.getElementById('langBtnDe');
+    const trBtn = document.getElementById('langBtnTr');
+    if (deBtn && trBtn) {
+        const setActive = (btn, active) => {
+            btn.style.background = active ? 'var(--primary)' : 'var(--card)';
+            btn.style.color = active ? 'white' : 'var(--text-secondary)';
+            btn.style.borderColor = active ? 'var(--primary)' : 'var(--border)';
+        };
+        setActive(deBtn, currentLanguage === 'de');
+        setActive(trBtn, currentLanguage === 'tr');
+    }
+}
+function closeMenu() {
+    document.getElementById('menuOverlay').classList.remove('active');
+    document.getElementById('slideMenu').classList.remove('active');
+}
+function menuNav(tab) {
+    closeMenu();
+    if (tab === 'rechner') {
+        rechnerFiliale = '';
+        rechnerOrderId = '';
+        // Quick-Input einblenden bei direktem Öffnen (ohne Bestellung)
+        const quickInput = document.getElementById('rechnerQuickInput');
+        if (quickInput) quickInput.style.display = '';
+        setTimeout(updateRechnerAbholbereitBtn, 100);
+    }
+    if (tab === 'mitarbeiter') { switchTab('settings'); setTimeout(() => { const el = document.getElementById('membersCard'); if(el) el.scrollIntoView({behavior:'smooth'}); }, 100); return; }
+    if (tab === 'materialien') { switchTab('materialien'); loadMaterials(); return; }
+    if (tab === 'wareneingang') { if (!hasPerm('lager_eingang') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('wareneingang'); initWareneingang(); return; }
+    if (tab === 'lager') { if (!hasPerm('lager_view') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('lager'); loadBestandsuebersicht(); return; }
+    if (tab === 'inventur') { if (!hasPerm('lager_inventur') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('inventur'); initInventur(); return; }
+    switchTab(tab);
+}
+
+// ═══ TABS ═══
+function switchTab(name) {
+    // v1.18.19: Wechsel zu "neu" mit ausgefüllten Feldern → Dialog
+    // (Mitarbeiter soll versehentliches Verwerfen vermeiden)
+    if (name === 'neu') {
+        const currentTab = document.querySelector('.tab-item.active')?.dataset?.tab;
+        const isAlreadyOnNeu = currentTab === 'neu';
+        const isEditingDraft = (typeof editingDraftId !== 'undefined') && editingDraftId;
+        if (!isAlreadyOnNeu && !isEditingDraft && typeof hasNewFormData === 'function' && hasNewFormData()) {
+            showConfirm(
+                'Neue Bestellung beginnen?',
+                'Es sind bereits Daten eingegeben. Möchtest du verwerfen und mit einer leeren Bestellung neu anfangen?\n\nTipp: Mit "Als Entwurf speichern" kannst du die Eingabe sichern.',
+                'Verwerfen',
+                () => {
+                    if (typeof resetNewForm === 'function') resetNewForm();
+                    _switchTabInternal('neu');
+                },
+                true  // danger
+            );
+            return;
+        }
+        // Wenn der User auf "+ Neu" klickt während er schon auf "neu" ist UND Daten drin sind
+        // → auch fragen (sonst klickt er aus Versehen und vermisst die Eingabe nicht).
+        // Ohne Daten: einfach Re-Render (tut nichts schädliches).
+        if (isAlreadyOnNeu && !isEditingDraft && typeof hasNewFormData === 'function' && hasNewFormData()) {
+            showConfirm(
+                'Neue Bestellung beginnen?',
+                'Es sind bereits Daten eingegeben. Möchtest du verwerfen und mit einer leeren Bestellung neu anfangen?\n\nTipp: Mit "Als Entwurf speichern" kannst du die Eingabe sichern.',
+                'Verwerfen',
+                () => {
+                    if (typeof resetNewForm === 'function') resetNewForm();
+                },
+                true
+            );
+            return;
+        }
+        // Sonst (leer oder im Entwurfs-Modus): einfach durchschalten
+        if (!isAlreadyOnNeu && !isEditingDraft) {
+            // Frische leere Form
+            if (typeof resetNewForm === 'function') resetNewForm();
+        }
+    }
+    _switchTabInternal(name);
+}
+
+function _switchTabInternal(name) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    // Show search+columns only on board tab
+    const boardFixed = document.getElementById('boardFixedArea');
+    if (boardFixed) boardFixed.style.display = name === 'board' ? '' : 'none';
+    if (name === 'neu') { renderNewForm(); if (typeof updateNewFormHeader === 'function') updateNewFormHeader(); }
+    if (name === 'board') renderBoardColumns();
+    if (name === 'dashboard') renderDashboard();
+    if (name === 'drafts') { cleanupExpiredDrafts(); renderDraftsList(); }
+    if (name === 'settings') {
+        loadMembers(); initBackupCard(); loadFilialen();
+        const stammEl = document.getElementById('stammdatenBlock');
+        if (stammEl) stammEl.style.display = (isAdmin() || isSuperAdmin()) ? 'block' : 'none';
+        if (isAdmin() || isSuperAdmin()) {
+            renderColorsList(); renderPlisseeColorsList(); renderVariantsList(); renderModelsList();
+        }
+        // Firmendaten-Karte befüllen (v1.16.2) - sichtbar nur für Admin/Superadmin
+        const companyCard = document.getElementById('companyDataCard');
+        if (companyCard) {
+            companyCard.style.display = (isAdmin() || isSuperAdmin()) ? '' : 'none';
+            if (isAdmin() || isSuperAdmin()) {
+                // Daten neu laden falls noch nicht oder veraltet
+                if (!cachedCompanyData) loadCompanyData().then(fillCompanyDataForm);
+                else fillCompanyDataForm();
+            }
+        }
+    }
+}
+
+// ═══ COLUMNS ═══
+function manageColumns() { const m=document.getElementById('columnsManager'); m.style.display=m.style.display==='none'?'block':'none'; renderColumnsEdit(); }
+function renderColumnsEdit() {
+    document.getElementById('columnsListEdit').innerHTML = boardColumns.map((col,i) => {
+        const def=['Bestellung','In Produktion','Abholbereit','Abgeholt','Gelöscht'].includes(col);
+        return `<div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border-light)"><span style="font-size:14px;font-weight:500">${col}</span>${!def?`<button class="reset-btn" onclick="removeColumn(${i})" style="color:var(--red)">Entfernen</button>`:'<span style="font-size:11px;color:var(--text-muted)">Standard</span>'}</div>`;
+    }).join('');
+}
+function addColumn() {
+    const name=document.getElementById('newColName').value.trim();
+    if(!name) return; if(boardColumns.includes(name)){ showToast('Spalte existiert bereits.','warning'); return; }
+    boardColumns.push(name); document.getElementById('newColName').value='';
+    saveColumns(); renderColumnsEdit(); renderBoardColumns();
+}
+function removeColumn(i) {
+    const col=boardColumns[i];
+    if(orders.some(o=>o.column===col)){ showToast('Spalte enthält noch Bestellungen.','warning'); return; }
+    boardColumns.splice(i,1); if(activeColumn===col) activeColumn=boardColumns[0];
+    saveColumns(); renderColumnsEdit(); renderBoardColumns();
+}
+
+// ═══ MITARBEITER EINLADEN ═══
+// Zweite Firebase-App-Instanz, damit der aktuelle User nicht ausgeloggt wird
+const secondaryApp = firebase.initializeApp({
+    apiKey: "AIzaSyAWnVmmesRYiQmXIQBu-zIR73fsr9BkYyc",
+    authDomain: "fliegengitter-3486c.firebaseapp.com",
+    projectId: "fliegengitter-3486c"
+}, 'secondary');
+const secondaryAuth = secondaryApp.auth();
+
+async function inviteUser() {
+    const email = document.getElementById('inviteEmail').value.trim();
+    const pw = document.getElementById('invitePassword').value;
+    const msgEl = document.getElementById('inviteMsg');
+    msgEl.textContent = '';
+    msgEl.style.color = 'var(--text-secondary)';
+
+    if (!email || !pw) { msgEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; msgEl.style.color = 'var(--red)'; return; }
+    if (pw.length < 6) { msgEl.textContent = 'Passwort muss mindestens 6 Zeichen haben.'; msgEl.style.color = 'var(--red)'; return; }
+
+    msgEl.textContent = 'Wird angelegt...';
+    try {
+        const cred = await secondaryAuth.createUserWithEmailAndPassword(email, pw);
+        // Save to members collection
+        const role = document.getElementById('inviteRole').value || 'mitarbeiter';
+        const kurzname = document.getElementById('inviteKurzname').value.trim();
+        const filialeId = document.getElementById('inviteFiliale').value || '';
+        const filialeName = filialeId ? (filialen.find(f=>f.id===filialeId)||{}).name || '' : '';
+        await db.collection('members').doc(cred.user.uid).set({
+            email: email,
+            name: kurzname || email.split('@')[0] || 'Unbekannt',
+            role: role,
+            filialeId: filialeId,
+            filialeName: filialeName,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser ? currentUser.email : 'unknown'
+        });
+        await secondaryAuth.signOut();
+        document.getElementById('inviteEmail').value = '';
+        document.getElementById('inviteKurzname').value = '';
+        document.getElementById('invitePassword').value = '';
+        msgEl.textContent = '✅ ' + email + ' wurde erfolgreich angelegt!';
+        msgEl.style.color = 'var(--green)';
+        loadMembers();
+    } catch(e) {
+        let msg = 'Fehler beim Anlegen.';
+        if (e.code === 'auth/email-already-in-use') msg = 'Diese E-Mail ist bereits registriert.';
+        if (e.code === 'auth/invalid-email') msg = 'Ungültige E-Mail-Adresse.';
+        if (e.code === 'auth/weak-password') msg = 'Passwort zu schwach (min. 6 Zeichen).';
+        msgEl.textContent = msg;
+        msgEl.style.color = 'var(--red)';
+    }
+}
+
+async function loadMembers() {
+    const el = document.getElementById('membersList');
+    if (!el) return;
+    el.innerHTML = '<div class="loading" style="padding:12px">Wird geladen...</div>';
+    try {
+        const snap = await db.collection('members').orderBy('name').get();
+        if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px">Keine Mitglieder gefunden.</div>'; return; }
+
+        // SVG-Icons (Lucide-Stil)
+        const SVG_SHIELD = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>';
+        const SVG_BUILDING = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9 13h.01"/><path d="M15 13h.01"/><path d="M9 17h.01"/><path d="M15 17h.01"/></svg>';
+        const SVG_CLOCK = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.6"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+        const SVG_KEY = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>';
+        const SVG_USER_EDIT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+        const SVG_PIN = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+
+        el.innerHTML = snap.docs.map(d => {
+            const m = d.data();
+            const name = (m.name||'').charAt(0).toUpperCase() + (m.name||'').slice(1);
+            const initial = (m.name||'?').charAt(0).toUpperCase();
+            const isYou = currentUser && currentUser.uid === d.id;
+            const lastLogin = m.lastLogin ? formatLogTime(m.lastLogin) : '';
+            const role = m.role || 'mitarbeiter';
+            const roleLabel = role === 'admin' ? 'Admin' : 'Mitarbeiter';
+            const canToggleRole = !isYou && (isSuperAdmin() || (isAdmin() && role !== 'admin'));
+            const canEditPerms = !isYou && (isSuperAdmin() || (isAdmin() && role !== 'admin'));
+
+            // Rolle-Badge (immer sichtbar als Info, mit/ohne Klick)
+            const roleBadge = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;background:${role==='admin'?'var(--primary)':'var(--border-light)'};color:${role==='admin'?'white':'var(--text-muted)'};font-weight:600;${canToggleRole?'cursor:pointer':''}" ${canToggleRole?`onclick="toggleRole('${d.id}','${role}')" title="Rolle wechseln"`:''}>${SVG_SHIELD}${roleLabel}</span>`;
+
+            // Filiale-Badge
+            const filialeText = m.filialeName || 'Keine Filiale';
+            const hasFiliale = !!m.filialeName;
+            const filialeBadge = isAdmin()
+                ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;border:1px solid var(--primary);background:var(--primary-bg);color:var(--primary);font-weight:600;cursor:pointer" onclick="editMemberFiliale('${d.id}','${m.filialeId||''}')" title="Filiale ändern">${SVG_BUILDING}${filialeText}</span>`
+                : (hasFiliale ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;background:var(--primary-bg);color:var(--primary);font-weight:600">${SVG_BUILDING}${filialeText}</span>` : '');
+
+            // Action-Buttons (kompakt, mit Icons)
+            const permBtn = canEditPerms
+                ? `<button onclick="openPermEditor('${d.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-weight:600;cursor:pointer;font-family:inherit">${SVG_KEY}Rechte</button>`
+                : '';
+            const nameBtn = isAdmin() && !isYou
+                ? `<button onclick="editMemberName('${d.id}','${(m.name||'').replace(/'/g,"\\'")}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-weight:600;cursor:pointer;font-family:inherit">${SVG_USER_EDIT}Name</button>`
+                : '';
+
+            return `<div class="member-item" style="display:flex;gap:10px;align-items:flex-start;padding:12px 4px;border-bottom:1px solid var(--border-light)">
+                <div class="member-avatar" style="flex-shrink:0">${initial}</div>
+                <div style="flex:1;min-width:0">
+                    <!-- Zeile 1: Name + DU-Badge -->
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+                        <span style="font-weight:700;font-size:14px;color:var(--text)">${name}</span>
+                        ${isYou ? '<span class="member-you" style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--primary);color:white;font-weight:700;letter-spacing:0.04em">DU</span>' : ''}
+                    </div>
+                    <!-- Zeile 2: Email -->
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis">${m.email||''}</div>
+                    <!-- Zeile 3: Last-Login -->
+                    ${lastLogin ? `<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);margin-bottom:8px">${SVG_CLOCK}Zuletzt: ${lastLogin}</div>` : '<div style="margin-bottom:8px"></div>'}
+                    <!-- Zeile 4: Status-Badges -->
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">
+                        ${roleBadge}
+                        ${filialeBadge}
+                    </div>
+                    <!-- Zeile 5: Aktions-Buttons -->
+                    ${(permBtn || nameBtn) ? `<div style="display:flex;flex-wrap:wrap;gap:5px">${permBtn}${nameBtn}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px">Fehler beim Laden.</div>';
+        console.error(e);
+    }
+}
+
+async function toggleRole(uid, currentRole) {
+    if (currentRole === 'admin' && !isSuperAdmin()) { showToast('Nur Superadmin kann Admin-Rollen ändern.','warning'); return; }
+    const newRole = currentRole === 'admin' ? 'mitarbeiter' : 'admin';
+    const label = newRole === 'admin' ? 'zum Admin machen' : 'zum Mitarbeiter machen';
+    showConfirm('Rolle ändern', `Möchtest du diesen Benutzer ${label}?`, 'Ändern', async () => {
+        try {
+            await db.collection('members').doc(uid).update({ role: newRole, permissions: DEFAULT_PERMS[newRole] });
+            showToast(`Rolle auf ${newRole.toUpperCase()} geändert.`, 'success');
+            loadMembers();
+        } catch(e) {
+            showToast('Fehler: ' + e.message, 'error');
+        }
+    }, false);
+}
+
+async function openPermEditor(uid) {
+    // Load current permissions for this user
+    const doc = await db.collection('members').doc(uid).get();
+    if (!doc.exists) return;
+    const data = doc.data();
+    const role = data.role || 'mitarbeiter';
+    const perms = data.permissions || DEFAULT_PERMS[role] || DEFAULT_PERMS.mitarbeiter;
+    const name = (data.name || '').charAt(0).toUpperCase() + (data.name || '').slice(1);
+
+    let checksHtml = '';
+    Object.entries(PERM_GROUPS).forEach(([groupName, groupPerms]) => {
+        checksHtml += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary);margin-top:14px;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid var(--primary-bg)">${groupName}</div>`;
+        Object.entries(groupPerms).forEach(([key, label]) => {
+            const checked = perms[key] ? 'checked' : '';
+            const disabled = (role === 'admin' && !isSuperAdmin()) ? 'disabled' : '';
+            checksHtml += `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);cursor:pointer">
+                <input type="checkbox" ${checked} ${disabled} data-perm="${key}" style="width:18px;height:18px;accent-color:var(--primary)">
+                <span style="font-size:13px;${disabled ? 'opacity:0.5' : ''}">${label}</span>
+            </label>`;
+        });
+    });
+
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `<div class="confirm-box" style="max-width:420px;max-height:85vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div>
+                <div style="font-size:17px;font-weight:700">${name}</div>
+                <div style="font-size:12px;color:var(--text-muted)">${data.email} · ${role.toUpperCase()}</div>
+            </div>
+            <button onclick="this.closest('.confirm-overlay').remove()" style="background:var(--border-light);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer;font-weight:700"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        ${role === 'admin' ? '<div style="background:var(--primary-bg);color:var(--primary);padding:10px 14px;border-radius:10px;font-size:13px;font-weight:600;margin-bottom:12px">Admins haben automatisch alle Berechtigungen.</div>' : ''}
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:4px">Berechtigungen</div>
+        <div id="permChecks">${checksHtml}</div>
+        ${(role !== 'admin' || isSuperAdmin()) ? `<button onclick="savePerms('${uid}', this.closest('.confirm-overlay'))" style="width:100%;padding:13px;background:var(--primary);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:16px">Berechtigungen speichern</button>` : ''}
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function savePerms(uid, overlay) {
+    const checks = overlay.querySelectorAll('[data-perm]');
+    const perms = {};
+    checks.forEach(c => { perms[c.dataset.perm] = c.checked; });
+    try {
+        await db.collection('members').doc(uid).update({ permissions: perms });
+        showToast('Berechtigungen gespeichert.', 'success');
+        overlay.remove();
+        loadMembers();
+    } catch(e) {
+        showToast('Fehler: ' + e.message, 'error');
+    }
+}
+
+// ═══ B-WARE DETAIL VIEW ═══
+function openBWareDetail(id, o) {
+    const m = (o.measures && o.measures[0]) || {};
+    const breite = parseFloat(m.breite) || 0;
+    const hoehe = parseFloat(m.hoehe) || 0;
+    const farbe = m.farbe || o.farbe || '?';
+    const tuelIdx = abzuege.findIndex(a => a.name === 'Tül');
+    const enIdx = abzuege.findIndex(a => a.name === 'Profil En');
+    const tuelLen = m.tuelLen || (hoehe - abzuege[tuelIdx].abzug);
+    const tuelAdet = m.tuelAdet || ((breite - abzuege[enIdx].abzug) / 2);
+    const logs = (o.log||[]).map(l => `<div class="activity-item"><span class="activity-time">${formatLogTime(l.time)}</span><span class="activity-text">${escHtml(l.text)}</span></div>`).join('') || '';
+
+    const cs = {'Antrazit':{bg:'#4a4a4a',text:'#fff'},'Weiß':{bg:'#e8e8e8',text:'#333'},'Braun':{bg:'#8B4513',text:'#fff'}}[farbe] || {bg:'var(--primary)',text:'#fff'};
+
+    document.getElementById('modalStickyHeader').innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="modal-title" style="margin-bottom:0">B-Ware</div>
+            <button onclick="closeModal()" style="background:var(--border-light);color:var(--text-secondary);border:none;border-radius:10px;width:36px;height:36px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>`;
+
+    document.getElementById('modalContent').innerHTML = `
+        <div style="background:${cs.bg};color:${cs.text};border-radius:14px;padding:24px;text-align:center;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.7;margin-bottom:8px">${farbe}</div>
+            <div style="font-size:28px;font-weight:700">${breite} × ${hoehe} cm</div>
+            <div style="display:flex;justify-content:center;gap:20px;margin-top:12px;font-size:14px">
+                <div><div style="opacity:0.7;font-size:11px">Tül Länge</div><div style="font-weight:700;font-size:18px">${tuelLen.toFixed(1)} cm</div></div>
+                <div><div style="opacity:0.7;font-size:11px">Tül Adet</div><div style="font-weight:700;font-size:18px">${tuelAdet.toFixed(1)}</div></div>
+            </div>
+        </div>
+
+        ${o.bemerkung ? `<div class="card"><div class="card-label">Bemerkung</div><div style="font-size:14px;color:var(--text-secondary);font-style:italic">${escHtml(o.bemerkung)}</div></div>` : ''}
+
+        <div class="card">
+            <div class="card-label">Bearbeiten</div>
+            <div class="input-row mb-12">
+                <div class="field"><label>Breite (cm)</label><input type="number" id="bwEditBreite" value="${breite}" oninput="calcBwEditPreview()"></div>
+                <div class="field"><label>Höhe (cm)</label><input type="number" id="bwEditHoehe" value="${hoehe}" oninput="calcBwEditPreview()"></div>
+            </div>
+            <div class="field mb-12"><label>Farbe</label>
+                <select id="bwEditFarbe" style="width:100%;padding:10px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                    <option value="Antrazit"${farbe==='Antrazit'?' selected':''}>Antrazit</option>
+                    <option value="Weiß"${farbe==='Weiß'?' selected':''}>Weiß</option>
+                    <option value="Braun"${farbe==='Braun'?' selected':''}>Braun</option>
+                </select>
+            </div>
+            <div id="bwEditPreview" style="padding:10px;background:var(--border-light);border-radius:8px;margin-bottom:10px;font-size:13px"></div>
+            <div class="field mb-12"><label>Bemerkung</label><input type="text" id="bwEditBemerkung" value="${escHtml(o.bemerkung||'')}"></div>
+            <button class="action-btn primary" onclick="saveBWareEdit('${id}')" style="margin-bottom:8px">💾 B-Ware speichern</button>
+        </div>
+
+        ${logs ? `<div class="card"><div class="card-label">Aktivitäten</div><div class="activity-log">${logs}</div></div>` : ''}
+
+        <div class="modal-actions">
+            <button class="action-btn danger" onclick="permanentDeleteOrder('${id}')"><span style="display:inline-flex;margin-right:3px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span> Endgültig löschen</button>
+        </div>`;
+
+    document.getElementById('orderModal').classList.add('active');
+    calcBwEditPreview();
+}
+
+function calcBwEditPreview() {
+    const b = parseFloat(document.getElementById('bwEditBreite').value) || 0;
+    const h = parseFloat(document.getElementById('bwEditHoehe').value) || 0;
+    const el = document.getElementById('bwEditPreview');
+    if (!el || !b || !h) return;
+    const enIdx = abzuege.findIndex(a => a.name === 'Profil En');
+    const tuelIdx = abzuege.findIndex(a => a.name === 'Tül');
+    const tuelLen = h - abzuege[tuelIdx].abzug;
+    const tuelAdet = (b - abzuege[enIdx].abzug) / 2;
+    el.innerHTML = `Tül Länge: <b>${tuelLen.toFixed(1)} cm</b> · Tül Adet: <b>${tuelAdet.toFixed(1)}</b>`;
+}
+
+async function saveBWareEdit(id) {
+    const breite = parseFloat(document.getElementById('bwEditBreite').value);
+    const hoehe = parseFloat(document.getElementById('bwEditHoehe').value);
+    const farbe = document.getElementById('bwEditFarbe').value;
+    const bemerkung = document.getElementById('bwEditBemerkung').value.trim();
+    if (!breite || !hoehe) { showToast('Bitte Maße eingeben.', 'warning'); return; }
+
+    const enIdx = abzuege.findIndex(a => a.name === 'Profil En');
+    const tuelIdx = abzuege.findIndex(a => a.name === 'Tül');
+    const tuelLen = hoehe - abzuege[tuelIdx].abzug;
+    const tuelAdet = (breite - abzuege[enIdx].abzug) / 2;
+
+    await db.collection('orders').doc(id).update({
+        farbe, bemerkung: bemerkung || null,
+        measures: [{ breite, hoehe, stueck: 1, farbe, sqmPrice: 0, tuelLen, tuelAdet }],
+        log: firebase.firestore.FieldValue.arrayUnion({
+            time: firebase.firestore.Timestamp.now(),
+            text: getUserName() + ' hat B-Ware bearbeitet'
+        })
+    });
+    showToast('B-Ware gespeichert!', 'success');
+    setTimeout(() => openOrderDetail(id), 300);
+}
+
+// ═══ KURZNAME BEARBEITEN ═══
+function editMemberName(uid, currentName) {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `<div class="confirm-box" style="max-width:360px">
+        <div class="confirm-title">Kurzname ändern</div>
+        <div class="edit-field" style="margin:16px 0">
+            <input type="text" id="editKurzname" value="${escHtml(currentName)}" placeholder="Kurzname..." style="width:100%;padding:12px;font-size:16px;border:2px solid var(--border);border-radius:10px;font-family:inherit;text-align:center">
+        </div>
+        <div class="confirm-actions">
+            <button class="confirm-btn confirm-cancel" onclick="this.closest('.confirm-overlay').remove()">Abbrechen</button>
+            <button class="confirm-btn confirm-primary" onclick="saveMemberName('${uid}', this.closest('.confirm-overlay'))">Speichern</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    setTimeout(() => document.getElementById('editKurzname').focus(), 100);
+}
+
+async function saveMemberName(uid, overlay) {
+    const name = document.getElementById('editKurzname').value.trim();
+    if (!name) { showToast('Bitte Name eingeben.', 'warning'); return; }
+    try {
+        await db.collection('members').doc(uid).update({ name });
+        showToast('Kurzname geändert.', 'success');
+        overlay.remove();
+        loadMembers();
+    } catch(e) { showToast('Fehler: ' + e.message, 'error'); }
+}
+
+function editMemberFiliale(uid, currentFilialeId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    const options = filialen.map(f => `<option value="${f.id}"${f.id===currentFilialeId?' selected':''}>${f.name}</option>`).join('');
+    overlay.innerHTML = `<div class="confirm-box" style="max-width:360px">
+        <div class="confirm-title">Filiale zuweisen</div>
+        <div class="edit-field" style="margin:16px 0">
+            <select id="editFiliale" style="width:100%;padding:12px;font-size:16px;border:2px solid var(--border);border-radius:10px;font-family:inherit">
+                <option value="">— Keine Filiale —</option>
+                ${options}
+            </select>
+        </div>
+        <div class="confirm-actions">
+            <button class="confirm-btn confirm-cancel" onclick="this.closest('.confirm-overlay').remove()">Abbrechen</button>
+            <button class="confirm-btn confirm-primary" onclick="saveMemberFiliale('${uid}', this.closest('.confirm-overlay'))">Speichern</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function saveMemberFiliale(uid, overlay) {
+    const filialeId = document.getElementById('editFiliale').value;
+    const filialeName = filialeId ? (filialen.find(f => f.id === filialeId) || {}).name || '' : '';
+    try {
+        await db.collection('members').doc(uid).update({ filialeId, filialeName });
+        // Update current user if editing own filiale
+        if (currentUser && uid === currentUser.uid) {
+            currentUserFilialeId = filialeId;
+            currentUserFiliale = filialeName;
+        }
+        showToast('Filiale zugewiesen: ' + (filialeName || 'Keine'), 'success');
+        overlay.remove();
+        loadMembers();
+        generateEtikett();
+    } catch(e) { showToast('Fehler: ' + e.message, 'error'); }
+}
+
+// ═══ RECHNER ═══
+function selectColor(btn,name,bg,color) {
+    document.querySelectorAll('#tab-rechner .color-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); selectedColor=name; farbe={name,bg,color}; renderSummary();
+}
+function resetAbzuege() { abzuege=DEFAULTS.map(m=>({...m})); renderTable(); renderAbstand(); }
+
+function onAbzugChange(i,val) {
+    abzuege[i].abzug=parseFloat(val)||0;
+    if(abzuege[i].basis==='tuel_adet') return;
+    const b=parseFloat(document.getElementById('breite').value)||0, h=parseFloat(document.getElementById('hoehe').value)||0;
+    const basis=abzuege[i].basis==='breite'?b:h, mass=basis-abzuege[i].abzug;
+    const rows=document.querySelectorAll('#matTable tr');
+    if(rows[i]){ const mc=rows[i].querySelector('.mass-value'); if(mc) mc.textContent=mass.toFixed(1);
+    const inp=rows[i].querySelector('.abzug-input'); if(inp) inp.classList.toggle('modified',abzuege[i].abzug!==DEFAULTS[i].abzug); }
+    if(abzuege[i].name==='Profil En') renderTable();
+    renderAbstand();
+}
+
+// Rechner summary rendering
+
+function getColorStyle(colorName) {
+    const styles = {
+        'Antrazit': { bg: '#4a4a4a', text: '#ffffff', accent: '#cccccc' },
+        'Weiß': { bg: '#e8e8e8', text: '#333333', accent: '#666666' },
+        'Braun': { bg: '#8B4513', text: '#ffffff', accent: '#fac775' }
+    };
+    return styles[colorName] || { bg: '#534AB7', text: '#ffffff', accent: '#d4d0ff' };
+}
+
+function renderSummary() {
+    // kunde-Input gibt's seit v1.15.0-p7 nicht mehr in Quick-Eingabe
+    const kundeEl = document.getElementById('kunde');
+    const kunde = kundeEl ? kundeEl.value.trim() : '';
+    const breite = document.getElementById('breite').value || '0';
+    const hoehe = document.getElementById('hoehe').value || '0';
+    const stueck = document.getElementById('stueckzahl').value || '1';
+    const cs = getColorStyle(farbe.name);
+
+    // For new/direct rechner use, filiale comes from current user
+    // Don't overwrite if already set from an order
+    if (!rechnerFiliale) rechnerFiliale = currentUserFiliale || '';
+
+    // Single product in Rechner tab
+    const dt = document.getElementById('doppeltuer')?.checked || false;
+    summarySlides = [{ kunde, breite, hoehe, stueck, farbe: farbe.name, colorStyle: cs, doppeltuer: dt }];
+    currentSlide = 0;
+    renderSummarySlides();
+}
+
+function renderSummaryFromOrder(o) {
+    const measures = o.measures || [];
+    if (!measures.length) return;
+    // Store order's filiale for label printing
+    rechnerFiliale = o.filialeName || currentUserFiliale || '';
+
+    // v1.18.22: Jedes Stück bekommt eine eigene Slide.
+    // Vorher: 1 Maß-Zeile = 1 Slide (auch bei Stk:2 → man konnte nicht zwischen Stk 1 und 2 wechseln).
+    // Jetzt: Stk:2 → 2 Slides, jede mit stueck=1 (für korrekten Etikett-Druck pro Slide).
+    // displayTotalStueck zeigt die ursprüngliche Gesamt-Stückzahl der Maß-Zeile (für "Stk: 2"-Badge).
+    // duplicateIndex/duplicateTotal zeigen "1 von 2", "2 von 2" bei gleichen Maßen.
+    const expanded = [];
+    measures.forEach((m, mi) => {
+        const totalStk = parseInt(m.stueck) || 1;
+        for (let si = 0; si < totalStk; si++) {
+            expanded.push({
+                _origMeasure: m,
+                _measureIndex: mi,
+                _stkInMeasure: si + 1,
+                _totalStkInMeasure: totalStk
+            });
+        }
+    });
+    const totalExpanded = expanded.length;
+
+    summarySlides = expanded.map((ex, i) => {
+        const m = ex._origMeasure;
+        const cs = getColorStyle(m.farbe || o.farbe || 'Antrazit');
+        return {
+            kunde: (o.vorname || '') + ' ' + (o.nachname || ''),
+            breite: m.breite, hoehe: m.hoehe,
+            // stueck=1 pro Slide (für korrekten Etikett-Druck — jede Slide = 1 Etikett)
+            stueck: 1,
+            // displayTotalStueck = ursprüngliche Stk dieser Maß-Zeile (für Anzeige "Stk: 2" wenn Maß 2x bestellt)
+            displayTotalStueck: ex._totalStkInMeasure,
+            // Position innerhalb der Maß-Zeile bei Duplikaten ("Stk 1 von 2")
+            duplicateIndex: ex._stkInMeasure,
+            duplicateTotal: ex._totalStkInMeasure,
+            farbe: m.farbe || o.farbe || 'Antrazit',
+            colorStyle: cs,
+            nr: i + 1, total: totalExpanded,
+            doppeltuer: !!m.doppeltuer,
+            orderNumber: o.orderNumber || '',
+            bestelldatum: o.bestelldatum || '',
+            frist: o.frist || '',
+            // v1.16.8-p1: Variants und modelId für Pillen-Anzeige
+            variants: m.variants ? Object.assign({}, m.variants) : {},
+            modelId: m.modelId || ''
+        };
+    });
+    currentSlide = 0;
+    renderSummarySlides();
+}
+
+function renderSummarySlides() {
+    const container = document.getElementById('summarySlides');
+    const navR = document.getElementById('summaryNav');
+    const navL = document.getElementById('summaryNavLeft');
+    const dots = document.getElementById('summaryDots');
+    if (!container) return;
+
+    const multi = summarySlides.length > 1;
+
+    container.innerHTML = summarySlides.map((s, i) => {
+        const cs = s.colorStyle;
+        const isDark = s.farbe === 'Antrazit';
+        // v1.18.12-fix: renderMasseSvg ist in 08-order.js und lädt nach dem inline-Script.
+        // Falls dieser Code zu früh läuft (z.B. direkt nach Auth-Listener), Fallback geben.
+        const svg = (typeof renderMasseSvg === 'function')
+            ? renderMasseSvg(s.breite, s.hoehe, !!s.doppeltuer, true, isDark, s.variants && (s.variants.schwellenlos === 'ja' || s.variants.bodenprofil === 'ja'))
+            : '';
+        // v1.18.22: Stk-Anzeige verwendet displayTotalStueck (Ursprungs-Stk der Maß-Zeile),
+        // damit "Stk: 2" angezeigt wird obwohl die Slide selbst stueck=1 hat.
+        const stkShown = s.displayTotalStueck != null ? s.displayTotalStueck : (s.stueck || 1);
+        // Bei Duplikaten: kleiner Hinweis "Stück 1 von 2" zeigt welches Stück innerhalb des Maßes
+        const dupBadge = (s.duplicateTotal && s.duplicateTotal > 1)
+            ? `<span style="padding:4px 10px;border-radius:14px;font-size:12px;font-weight:700;background:rgba(255,255,255,0.18);letter-spacing:0.02em;color:${cs.text}">Stück ${s.duplicateIndex} von ${s.duplicateTotal}</span>`
+            : '';
+        // v1.18.22: Großes Türkis-Badge oben mit "1 / 3" — auffällig, funktioniert auf jedem Hintergrund.
+        // Padding seitlich (px-58) sodass die Pfeil-Buttons (width=44, right/left=10) NICHT mehr in den Text reinragen.
+        return `<div style="min-width:100%;padding:18px 58px 18px 58px;background:${cs.bg};color:${cs.text};transition:background 0.3s;position:relative">
+            ${multi ? `<div style="display:flex;justify-content:center;margin-bottom:10px"><div style="display:inline-block;padding:6px 16px;border-radius:999px;background:#1FA9B7;color:#ffffff;font-size:18px;font-weight:800;letter-spacing:0.03em;box-shadow:0 2px 6px rgba(0,0,0,0.18);min-width:64px;text-align:center">${s.nr} / ${s.total}</div></div>` : ''}
+            ${s.orderNumber ? '<div style="font-size:14px;font-weight:700;letter-spacing:0.02em;margin-bottom:8px;text-align:center;opacity:0.95">' + s.orderNumber + '</div>' : ''}
+            <div style="display:flex;align-items:center;gap:12px">
+                <div style="flex:1;text-align:left;min-width:0">
+                    <div style="font-size:20px;font-weight:700;margin-bottom:6px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.kunde || ''}</div>
+                    <div style="font-size:28px;font-weight:800;color:${cs.accent};line-height:1.1;margin-bottom:10px">${s.breite} × ${s.hoehe} cm</div>
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <span style="padding:5px 14px;border-radius:20px;font-size:14px;font-weight:700;background:rgba(255,255,255,0.25);letter-spacing:0.02em">${s.farbe}</span>
+                        <span style="font-size:16px;font-weight:700;color:${cs.accent}">Stk: ${stkShown}</span>
+                        ${dupBadge}
+                    </div>
+                </div>
+                <div style="flex-shrink:0">${svg}${typeof renderMeasureVariantPills === 'function' ? renderMeasureVariantPills(s, {compact:true, darkBg:isDark}) : ''}</div>
+            </div>
+        </div>`;
+    }).join('');
+
+    container.style.transform = `translateX(-${currentSlide * 100}%)`;
+
+    if (navR) navR.style.display = multi && currentSlide < summarySlides.length - 1 ? 'block' : 'none';
+    if (navL) navL.style.display = multi && currentSlide > 0 ? 'block' : 'none';
+    if (dots && multi) {
+        dots.style.display = 'flex';
+        dots.innerHTML = summarySlides.map((_, i) =>
+            `<div style="width:8px;height:8px;border-radius:50%;background:${i === currentSlide ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)'};transition:background 0.2s;cursor:pointer" onclick="goToSlide(${i})"></div>`
+        ).join('');
+    } else if (dots) {
+        dots.style.display = 'none';
+    }
+}
+
+function nextSummarySlide() {
+    if (currentSlide < summarySlides.length - 1) { currentSlide++; renderSummarySlides(); applySlideMeasures(); }
+}
+function prevSummarySlide() {
+    if (currentSlide > 0) { currentSlide--; renderSummarySlides(); applySlideMeasures(); }
+}
+function goToSlide(i) {
+    currentSlide = i; renderSummarySlides(); applySlideMeasures();
+}
+
+// When switching slides, update the Rechner input fields + recalculate Schnittmaße
+function applySlideMeasures() {
+    const s = summarySlides[currentSlide];
+    if (!s) return;
+
+    // Update input fields
+    document.getElementById('breite').value = s.breite;
+    document.getElementById('hoehe').value = s.hoehe;
+    document.getElementById('stueckzahl').value = s.stueck;
+
+    // Update Farbe buttons
+    const farbeName = s.farbe || 'Antrazit';
+    const idx = { Antrazit: 0, 'Weiß': 1, Braun: 2 }[farbeName];
+    if (idx !== undefined) {
+        document.querySelectorAll('#tab-rechner .color-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+        const bg = ['#4a4a4a', '#e0e0e0', '#8B4513'], cl = ['#ccc', '#444', '#fac775'];
+        farbe = { name: farbeName, bg: bg[idx], color: cl[idx] };
+        selectedColor = farbeName;
+    }
+
+    // Sync Doppeltür checkbox
+    const dtCheckbox = document.getElementById('rechnerDoppeltuer');
+    if (dtCheckbox) dtCheckbox.checked = !!s.doppeltuer;
+
+    // Recalculate Schnittmaße und Abstände
+    renderTable();
+    renderAbstand();
+    generateEtikett();
+    updateRechnerMassePreview();
+}
+
+function renderTable() {
+    const breite=parseFloat(document.getElementById('breite').value)||0, hoehe=parseFloat(document.getElementById('hoehe').value)||0;
+    const isDoppeltuer = document.getElementById('rechnerDoppeltuer') && document.getElementById('rechnerDoppeltuer').checked;
+
+    // v1.14.0: Aus Modell-Schnittliste rechnen wenn aktive Bestellung ein Maß mit modelId hat
+    let modelMaterials = null;
+    let modelName = '';
+    let measureVariants = {}; // v1.16.7 - Variants des aktiven Maßes für Cut-Conditions
+    if (rechnerOrderId) {
+        const o = orders.find(x => x.id === rechnerOrderId);
+        if (o && o.measures && o.measures.length) {
+            // Finde das Maß zu den aktuellen Maßen (für Multi-Maß-Bestellungen)
+            const matchedMeasure = o.measures.find(mm =>
+                Math.abs((mm.breite || 0) - breite) < 0.5 &&
+                Math.abs((mm.hoehe || 0) - hoehe) < 0.5
+            ) || o.measures[0];
+            const mid = matchedMeasure.modelId;
+            // Variants übernehmen (für Cut-Conditions, v1.16.7)
+            measureVariants = Object.assign({}, matchedMeasure.variants || {});
+            // Türart aus doppeltuer ableiten falls fehlt
+            if (!measureVariants.tuerart) {
+                measureVariants.tuerart = matchedMeasure.doppeltuer ? 'doppel' : 'einzel';
+            }
+            if (mid) {
+                const model = getModel(mid);
+                // Modell-Mode aktivieren wenn Modell existiert UND `sections` definiert ist —
+                // auch wenn die Schnittliste leer ist (User hat absichtlich keine Materialien zugewiesen)
+                if (model && model.sections && model.sections[0]) {
+                    modelMaterials = model.sections[0].materials || [];
+                    modelName = model.name || mid;
+                }
+            }
+        }
+    }
+
+    let html = '';
+    if (modelMaterials) {
+        // ═══ Modell-basierte Schnittliste (v1.14.0) ═══
+        // Cross-Material-Lookup für Tül-Adet: Profil-Breite-Abzug aus dem Modell
+        let enAbzug = 4.0;
+        for (const mm of modelMaterials) {
+            const matInfo = cachedMaterials.find(cm => cm.id === mm.materialId);
+            if (matInfo && matInfo.type === 'stange' && mm.cuts?.length) {
+                const breiteCut = mm.cuts.find(c => c.basis === 'breite');
+                if (breiteCut) { enAbzug = breiteCut.abzug || 0; break; }
+            }
+        }
+
+        modelMaterials.forEach(mm => {
+            const matInfo = cachedMaterials.find(cm => cm.id === mm.materialId);
+            if (!matInfo || matInfo.active === false) return;
+            // Filter ET/DT (am Material, wie heute)
+            if (isDoppeltuer && matInfo.nurEinzeltuer) return;
+            if (!isDoppeltuer && matInfo.nurDoppeltuer) return;
+
+            const cuts = mm.cuts || [];
+            if (!cuts.length && matInfo.type !== 'flaeche' && !matInfo.perSqm && !matInfo.perOrder) return;
+
+            // Material-Header
+            html += `<tr><td colspan="5" style="font-size:12px;font-weight:700;color:var(--primary);padding:8px 0 2px;border-bottom:2px solid var(--primary-bg)">${escHtml(translateMaterial(matInfo.name))}</td></tr>`;
+
+            if (matInfo.type === 'netz' && cuts.length) {
+                const enMass = breite - enAbzug;
+                // Tül-Adet bei DT halbieren (2 Flügel je halbe Breite), aufrunden (v1.16.0)
+                const stueck = isDoppeltuer ? 2 : 1;
+                const tuelAdet = Math.ceil(isDoppeltuer ? (enMass / 2 / 2) : (enMass / 2));
+                const abzugLabel = isDoppeltuer ? `−${enAbzug} ÷ 2 ÷ 2` : `−${enAbzug} ÷ 2`;
+                html += `<tr><td>${translateMaterial('Tül Adet')}</td><td><span class="bestell-val">${breite.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">${abzugLabel}</td><td>${stueck}</td><td><span class="mass-value">${tuelAdet}</span></td></tr>`;
+                const tuelCut = cuts.find(c => c.basis === 'hoehe');
+                if (tuelCut) {
+                    const tuelLen = hoehe - (tuelCut.abzug || 0);
+                    html += `<tr><td>${escHtml(translateMaterial(tuelCut.label))}</td><td><span class="bestell-val">${hoehe.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${tuelCut.abzug}</td><td>1</td><td><span class="mass-value">${tuelLen.toFixed(1)}</span></td></tr>`;
+                }
+            } else if (matInfo.type === 'flaeche') {
+                const sqm = (breite/100) * (hoehe/100);
+                const perSqm = isDoppeltuer && matInfo.dtPerSqm ? matInfo.dtPerSqm : (matInfo.perSqm||0);
+                const total = sqm * perSqm;
+                html += `<tr><td>m²</td><td><span class="bestell-val">${sqm.toFixed(2)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">× ${perSqm}</td><td>1</td><td><span class="mass-value">${total.toFixed(1)} m</span></td></tr>`;
+            } else if (matInfo.perOrder) {
+                html += `<tr><td>Pro Bestellung</td><td></td><td></td><td>${matInfo.perOrder}</td><td><span class="mass-value">${matInfo.perOrder} ${matInfo.unit||'Stk'}</span></td></tr>`;
+            } else {
+                cuts.forEach(cut => {
+                    if (cut.basis === 'tuel_adet') return;
+                    // v1.16.7: Cut-Condition prüfen
+                    if (cut.condition && !cutConditionMatches(cut.condition, measureVariants)) return;
+                    // v1.16.8: Overrides anwenden
+                    const eff = getEffectiveCutValues(cut, measureVariants);
+                    const basis = cut.basis === 'breite' ? breite : hoehe;
+                    const mass = basis - eff.abzug;
+                    const baseStueck = eff.stueck;
+                    const dtF = eff.doppeltuerFaktor;
+                    let stueckDisplay = String(baseStueck);
+                    if (isDoppeltuer && dtF > 1) {
+                        const dtStueck = baseStueck * dtF;
+                        stueckDisplay = `<span style="color:var(--primary);font-weight:700">${dtStueck}</span> <span style="font-size:10px;color:var(--text-muted)">(${baseStueck}×${dtF})</span>`;
+                    }
+                    // Hinweis-Marker wenn Override aktiv
+                    const hasActiveOverride = (cut.overrides || []).some(ov => cutConditionMatches(ov.when, measureVariants));
+                    const overrideMarker = hasActiveOverride ? ' <span style="font-size:9px;color:var(--amber);font-weight:700" title="Override aktiv">⚡</span>' : '';
+                    html += `<tr><td>${escHtml(translateMaterial(cut.label))}${overrideMarker}</td><td><span class="bestell-val">${basis.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${eff.abzug}</td><td>${stueckDisplay}</td><td><span class="mass-value">${mass.toFixed(1)}</span></td></tr>`;
+                });
+            }
+        });
+
+        // Modell-Hinweis oben einblenden
+        const modelHint = `<tr><td colspan="5" style="padding:4px 6px;background:var(--primary-bg);font-size:11px;color:var(--primary);font-weight:600;text-align:center">Modell: ${escHtml(modelName)}</td></tr>`;
+
+        // Falls Schnittliste leer (Modell wurde noch nicht gepflegt)
+        if (!html) {
+            html = `<tr><td colspan="5" style="padding:24px 12px;text-align:center;font-size:13px;color:var(--text-muted);background:#fef3c7;border-left:3px solid #d97706"><strong>Schnittliste leer.</strong><br><span style="font-size:11px">Im Modell <em>${escHtml(modelName)}</em> wurden noch keine Materialien zugewiesen.<br>Settings → Modelle → ${escHtml(modelName)} → Schnittliste pflegen.</span></td></tr>`;
+        }
+
+        html = modelHint + html;
+
+        document.getElementById('matTable').innerHTML = html;
+        return;
+    }
+
+    // ═══ Fallback: alte Material-basierte Logik (kein Modell verfügbar) ═══
+    const rechnerMats = cachedMaterials.filter(m => {
+        if (!m.active) return false;
+        if (!(m.showInRechner || m.rechnerFields?.length)) return false;
+        if (isDoppeltuer && m.nurEinzeltuer) return false;
+        if (!isDoppeltuer && m.nurDoppeltuer) return false;
+        return true;
+    });
+
+    if (rechnerMats.length) {
+        rechnerMats.forEach(mat => {
+            const matCuts = (mat.cuts && mat.cuts.length) ? mat.cuts
+                : (mat.rechnerFields || []).map(fn => {
+                    const ab = abzuege.find(a => a.name === fn);
+                    return ab ? { label: ab.name, abzug: ab.abzug, stueck: ab.stueck, basis: ab.basis, doppeltuerFaktor: 1 } : null;
+                }).filter(Boolean);
+
+            if (!matCuts.length && mat.type !== 'flaeche' && !mat.perSqm && !mat.perOrder) return;
+
+            html += `<tr><td colspan="5" style="font-size:12px;font-weight:700;color:var(--primary);padding:8px 0 2px;border-bottom:2px solid var(--primary-bg)">${escHtml(translateMaterial(mat.name))}</td></tr>`;
+
+            if (mat.type === 'netz' && matCuts.length) {
+                let enAbzug = 4.0;
+                for (const rm of rechnerMats) {
+                    if (rm.type === 'stange' && rm.cuts?.length) {
+                        const breiteCut = rm.cuts.find(c => c.basis === 'breite');
+                        if (breiteCut) { enAbzug = breiteCut.abzug || 0; break; }
+                    }
+                }
+                const enMass = breite - enAbzug;
+                // Tül-Adet bei DT halbieren (2 Flügel je halbe Breite), aufrunden (v1.16.0)
+                const stueck = isDoppeltuer ? 2 : 1;
+                const tuelAdet = Math.ceil(isDoppeltuer ? (enMass / 2 / 2) : (enMass / 2));
+                const abzugLabel = isDoppeltuer ? `−${enAbzug} ÷ 2 ÷ 2` : `−${enAbzug} ÷ 2`;
+                html += `<tr><td>${translateMaterial('Tül Adet')}</td><td><span class="bestell-val">${breite.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">${abzugLabel}</td><td>${stueck}</td><td><span class="mass-value">${tuelAdet}</span></td></tr>`;
+
+                const tuelCut = matCuts.find(c => c.basis === 'hoehe');
+                if (tuelCut) {
+                    const tuelLen = hoehe - (tuelCut.abzug || 0);
+                    html += `<tr><td>${escHtml(translateMaterial(tuelCut.label))}</td><td><span class="bestell-val">${hoehe.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${tuelCut.abzug}</td><td>1</td><td><span class="mass-value">${tuelLen.toFixed(1)}</span></td></tr>`;
+                }
+            } else if (mat.type === 'flaeche') {
+                const sqm = (breite/100) * (hoehe/100);
+                const perSqm = isDoppeltuer && mat.dtPerSqm ? mat.dtPerSqm : (mat.perSqm||0);
+                const total = sqm * perSqm;
+                html += `<tr><td>m²</td><td><span class="bestell-val">${sqm.toFixed(2)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">× ${perSqm}</td><td>1</td><td><span class="mass-value">${total.toFixed(1)} m</span></td></tr>`;
+            } else if (mat.perOrder) {
+                html += `<tr><td>Pro Bestellung</td><td></td><td></td><td>${mat.perOrder}</td><td><span class="mass-value">${mat.perOrder} ${mat.unit||'Stk'}</span></td></tr>`;
+            } else {
+                matCuts.forEach(cut => {
+                    if (cut.basis === 'tuel_adet') return;
+                    const basis = cut.basis === 'breite' ? breite : hoehe;
+                    const mass = basis - (cut.abzug || 0);
+                    const baseStueck = cut.stueck || 1;
+                    const dtF = cut.doppeltuerFaktor || 1;
+                    let stueckDisplay = String(baseStueck);
+                    if (isDoppeltuer && dtF > 1) {
+                        const dtStueck = baseStueck * dtF;
+                        stueckDisplay = `<span style="color:var(--primary);font-weight:700">${dtStueck}</span> <span style="font-size:10px;color:var(--text-muted)">(${baseStueck}×${dtF})</span>`;
+                    }
+                    html += `<tr><td>${escHtml(translateMaterial(cut.label))}</td><td><span class="bestell-val">${basis.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${cut.abzug}</td><td>${stueckDisplay}</td><td><span class="mass-value">${mass.toFixed(1)}</span></td></tr>`;
+                });
+            }
+        });
+    } else {
+        // Fallback to old abzuege system
+        const enIdx=abzuege.findIndex(m=>m.name==='Profil En');
+        const enMass = enIdx>=0 ? breite-abzuege[enIdx].abzug : 0;
+        const tuelAdet = enMass/2;
+        abzuege.forEach((m,i)=>{
+            if(m.basis==='tuel_adet'){ html+=`<tr><td>${escHtml(translateMaterial(m.name))}</td><td><span class="bestell-val">${enMass.toFixed(1)}</span></td><td style="text-align:center;color:var(--text-muted);font-size:12px">÷ 2</td><td>1</td><td><span class="mass-value">${tuelAdet.toFixed(1)}</span></td></tr>`; return; }
+            const stueck = m.stueck;
+            const basis=m.basis==='breite'?breite:hoehe, mass=basis-m.abzug;
+            html+=`<tr><td>${escHtml(translateMaterial(m.name))}</td><td><span class="bestell-val">${basis.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${m.abzug}</td><td>${stueck}</td><td><span class="mass-value">${mass.toFixed(1)}</span></td></tr>`;
+        });
+    }
+    document.getElementById('matTable').innerHTML=html;
+}
+
+function renderAbstand() {
+    const hoehe=parseFloat(document.getElementById('hoehe').value)||0;
+    // Find Tül abzug from materials cuts or fallback to abzuege
+    let tuelAbzug = 4.0; // default
+    const tuelMat = cachedMaterials.find(m => m.type === 'netz' && m.active);
+    if (tuelMat && tuelMat.cuts?.length) {
+        const tuelCut = tuelMat.cuts.find(c => c.basis === 'hoehe');
+        if (tuelCut) tuelAbzug = tuelCut.abzug || 4.0;
+    } else {
+        const tuelIdx = abzuege.findIndex(m => m.name === 'Tül');
+        if (tuelIdx >= 0) tuelAbzug = abzuege[tuelIdx].abzug;
+    }
+    const tuelMass = hoehe - tuelAbzug, nutzbar = tuelMass - 10;
+    document.getElementById('tuelInfo').innerHTML=`Tül: <strong>${tuelMass.toFixed(1)} cm</strong> → Nutzbar: <strong>${nutzbar.toFixed(1)} cm</strong>`;
+    document.getElementById('abstandGrid').innerHTML=TEILER.map(t=>{const ab=nutzbar/t,ok=ab>=20&&ab<=35; return `<div class="ab-item ${ok?'ok':'warn'}"><span class="ab-teiler">÷${t}</span><span class="ab-wert">${ab.toFixed(1)}</span></div>`;}).join('');
+}
+
+function renderAll() {
+    renderSummary(); renderTable(); renderAbstand();
+    // Check B-Ware in Rechner
+    const b = parseFloat(document.getElementById('breite').value) || 0;
+    const h = parseFloat(document.getElementById('hoehe').value) || 0;
+    if (b && h) checkBWare(b, h, selectedColor);
+}
+
+// ═══ ROLE MANAGEMENT ═══
+function esc(s){return(s||'').replace(/'/g,"\\'").replace(/\n/g,' ');}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function farbeColor(f){return f==='Antrazit'?'#4a4a4a':f==='Weiß'?'#888':f==='Braun'?'#8B4513':'var(--primary)';}
+
+// Normalize phone: handles 0660..., 0043..., +43..., with/without spaces
+function normalizePhone(vorwahl, nummer) {
+    let raw = (nummer || '').replace(/[\s\-()]/g, '');
+    if (!raw) return '';
+    if (raw.startsWith('+')) return raw;
+    if (raw.startsWith('0043')) return '+43' + raw.slice(4).replace(/^0+/, '');
+    if (raw.startsWith('0')) return vorwahl + raw.slice(1);
+    return vorwahl + raw;
+}
+
+// Auto-format phone on input: strip leading 0, 0043 etc
+function autoFormatPhone(input, vorwahlId) {
+    let val = input.value.replace(/[\s\-()]/g, '');
+    if (val.startsWith('0043')) {
+        input.value = val.slice(4).replace(/^0+/, '');
+    } else if (val.startsWith('+43')) {
+        document.getElementById(vorwahlId).value = '+43';
+        input.value = val.slice(3).replace(/^0+/, '');
+    } else if (val.startsWith('+')) {
+        // Other international prefix - find matching vorwahl
+        const vwList = ['+421','+420','+387','+385','+381','+90','+49','+48','+44','+43','+41','+40','+39','+36'];
+        for (const vw of vwList) {
+            if (val.startsWith(vw)) {
+                document.getElementById(vorwahlId).value = vw;
+                input.value = val.slice(vw.length).replace(/^0+/, '');
+                return;
+            }
+        }
+    } else if (val.startsWith('0') && val.length > 1) {
+        input.value = val.slice(1);
+    }
+}
+function isSuperAdmin() { return currentUser && currentUser.email === SUPERADMIN_EMAIL; }
+function isAdmin() { return currentUserRole === 'admin' || currentUserRole === 'superadmin' || isSuperAdmin(); }
+function hasPerm(perm) { return isAdmin() || currentUserPerms[perm] === true; }
+
+function applyRoleRestrictions() {
+    // Admin sees everything
+    if (isAdmin()) {
+        document.querySelectorAll('.tab-item').forEach(t => t.style.display = '');
+        const inviteSection = document.getElementById('inviteSection');
+        if (inviteSection) { const card = inviteSection.closest('.card'); if (card) card.style.display = 'block'; }
+        const sqmEl = document.getElementById('sqmPrice');
+        if (sqmEl) { sqmEl.disabled = false; sqmEl.style.opacity = '1'; }
+        const colBtn = document.querySelector('[onclick="manageColumns()"]');
+        if (colBtn) { const row = colBtn.closest('.setting-row'); if (row) row.style.display = 'flex'; }
+        return;
+    }
+
+    // Mitarbeiter: check permissions for sidebar menu items
+    const menuPerms = {
+        'rechner': 'rechner_use',
+        'lager': 'lager_view',
+        'wareneingang': 'lager_eingang',
+        'inventur': 'lager_inventur',
+        'materialien': 'lager_view',
+        'dashboard': 'dashboard_view',
+        'settings': 'settings_view'
+    };
+    Object.entries(menuPerms).forEach(([tab, perm]) => {
+        const el = document.querySelector('.menu-item[data-tab="' + tab + '"]');
+        if (el) el.style.display = hasPerm(perm) ? '' : 'none';
+    });
+    const settingsTab = document.querySelector('[data-tab="settings"]');
+    if (settingsTab) settingsTab.style.display = hasPerm('settings_view') ? '' : 'none';
+
+    // Invite section
+    const inviteSection = document.getElementById('inviteSection');
+    if (inviteSection) {
+        const card = inviteSection.closest('.card');
+        if (card) card.style.display = hasPerm('members_invite') ? 'block' : 'none';
+    }
+
+    // sqmPrice
+    const sqmEl = document.getElementById('sqmPrice');
+    if (sqmEl) {
+        sqmEl.disabled = !hasPerm('price_edit');
+        sqmEl.style.opacity = hasPerm('price_edit') ? '1' : '0.5';
+    }
+    const dtEl = document.getElementById('doppeltuerPriceInput');
+    if (dtEl) {
+        dtEl.disabled = !hasPerm('price_edit');
+        dtEl.style.opacity = hasPerm('price_edit') ? '1' : '0.5';
+    }
+
+    // Columns manager
+    const colBtn = document.querySelector('[onclick="manageColumns()"]');
+    if (colBtn) {
+        const row = colBtn.closest('.setting-row');
+        if (row) row.style.display = hasPerm('columns_manage') ? 'flex' : 'none';
+    }
+
+    // Neu tab (create orders)
+    const neuTab = document.querySelector('[data-tab="neu"]');
+    if (neuTab) neuTab.style.display = hasPerm('orders_create') ? '' : 'none';
+
+
+
+
+    // Rechner tab
+    const rechnerTab = document.querySelector('[data-tab="rechner"]');
+    if (rechnerTab) rechnerTab.style.display = hasPerm('rechner_use') ? '' : 'none';
+    const dashTab = document.querySelector('[data-tab="dashboard"]');
+    if (dashTab) dashTab.style.display = hasPerm('dashboard_view') ? '' : 'none';
+}
+
+let totalOverrideValue = null;
+
+function onTotalOverride(orderId) {
+    const input = document.getElementById('editTotalOverride');
+    if (!input) return;
+    // v1.16.8-p3: 0 als gültigen Wert erlauben (nicht durch || 0 überschreiben)
+    const parsed = parseFloat(input.value);
+    totalOverrideValue = isNaN(parsed) ? 0 : parsed;
+    // Recalculate offen with overridden total
+    const o = orders.find(x => x.id === orderId);
+    const payments = o ? (o.payments || []) : [];
+    const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
+    const offen = totalOverrideValue - totalPaid;
+    const isPaid = o && o.paid;
+
+    const paidPercent = totalOverrideValue > 0 ? Math.min(100, Math.round((totalPaid / totalOverrideValue) * 100)) : 0;
+    const barColor = offen <= 0 ? 'var(--green)' : totalPaid > 0 ? 'var(--amber)' : 'var(--red)';
+
+    // Update progress bar, offen display, and payment button
+    const summaryEl = document.getElementById('editPriceSummary');
+    const paySection = document.getElementById('editPaymentSection');
+    if (!summaryEl) return;
+
+    // We need to rebuild the part after the total input - find and update
+    // Just recalc without re-rendering (to keep focus on input)
+    const offelEl = document.getElementById('editOffenDisplay');
+    if (offelEl) {
+        offelEl.style.background = offen <= 0 ? 'var(--green-bg)' : 'var(--red-bg)';
+        offelEl.innerHTML = `<span style="font-size:15px;font-weight:700;color:${offen<=0?'var(--green)':'var(--red)'}">${offen<=0?'<span style="display:inline-flex;vertical-align:middle;margin-right:3px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span> Vollständig bezahlt':'Offener Betrag'}</span><span style="font-size:18px;font-weight:700;color:${offen<=0?'var(--green)':'var(--red)'}">€ ${offen.toFixed(2)}</span>`;
+    }
+    if (paySection && !isPaid && offen > 0) {
+        paySection.innerHTML = `
+            <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+                <input type="number" id="addPaymentAmount" placeholder="Betrag €" step="0.01" style="flex:1;padding:11px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;text-align:center">
+                <button onclick="addPayment('${orderId}')" style="padding:11px 18px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">＋ Zahlung</button>
+            </div>
+        `;
+    }
+}
+
+// v1.18.5-phase4: renderAll() braucht checkBWare aus 04-stock.js (extern geladen).
+// 'load' Event feuert NACH allen externen Scripts — anders als setTimeout(0).
+window.addEventListener('load', () => {
+    try { renderAll(); } catch(e) { console.error('renderAll init:', e); }
+});
+
+// ═══ BACKUP SYSTEM ═══
+
+async function createBackupData() {
+    const backup = { version: '5.9', createdAt: new Date().toISOString(), collections: {} };
+    for (const col of BACKUP_COLLECTIONS) {
+        try {
+            const snap = await db.collection(col).get();
+            backup.collections[col] = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+        } catch(e) { backup.collections[col] = []; }
+    }
+    return backup;
+}
+
+async function autoBackupAfterOrder() {
+    if (!isSuperAdmin() && !isAdmin()) return;
+    try {
+        const backup = await createBackupData();
+        // Save to Firestore backups collection (keep last 5)
+        const backupRef = await db.collection('backups').add({
+            data: JSON.stringify(backup),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser ? currentUser.email : 'unknown',
+            orderCount: (backup.collections.orders || []).length
+        });
+
+        // Delete old backups (keep last 5)
+        const oldSnap = await db.collection('backups').orderBy('createdAt', 'desc').get();
+        if (oldSnap.size > 5) {
+            const toDelete = oldSnap.docs.slice(5);
+            const batch = db.batch();
+            toDelete.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+    } catch(e) { console.error('Auto-backup error:', e); }
+}
+
+async function downloadBackup() {
+    showToast('Backup wird erstellt...', 'info');
+    try {
+        const backup = await createBackupData();
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const datum = new Date().toISOString().split('T')[0];
+        a.href = url;
+        a.download = `fliegengitter_backup_${datum}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        // Save download date
+        localStorage.setItem('lastBackupDownload', new Date().toISOString());
+        updateBackupInfo();
+
+        const orderCount = (backup.collections.orders || []).length;
+        const matCount = (backup.collections.materials || []).length;
+        showToast(`Backup gespeichert: ${orderCount} Bestellungen, ${matCount} Materialien`, 'success', 4000);
+    } catch(e) { showToast('Backup-Fehler: ' + e.message, 'error'); }
+}
+
+async function restoreBackup(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+
+    if (!isSuperAdmin()) { showToast('Nur Superadmin kann Backups wiederherstellen.', 'warning'); return; }
+
+    const text = await file.text();
+    let backup;
+    try { backup = JSON.parse(text); } catch(e) { showToast('Ungültige Datei.', 'error'); return; }
+
+    if (!backup.collections) { showToast('Kein gültiges Backup.', 'error'); return; }
+
+    const orderCount = (backup.collections.orders || []).length;
+    const datum = backup.createdAt ? new Date(backup.createdAt).toLocaleDateString('de-AT') : '?';
+
+    showConfirm(
+        'Backup wiederherstellen?',
+        `Backup vom ${datum} mit ${orderCount} Bestellungen wiederherstellen? ACHTUNG: Alle aktuellen Daten werden überschrieben!`,
+        'Wiederherstellen',
+        async () => {
+            showToast('Backup wird wiederhergestellt...', 'info');
+            try {
+                for (const [colName, docs] of Object.entries(backup.collections)) {
+                    if (!BACKUP_COLLECTIONS.includes(colName)) continue;
+
+                    // Delete existing docs
+                    const existing = await db.collection(colName).get();
+                    const delBatch = db.batch();
+                    existing.docs.forEach(d => delBatch.delete(d.ref));
+                    await delBatch.commit();
+
+                    // Write backup docs in batches of 500
+                    for (let i = 0; i < docs.length; i += 450) {
+                        const chunk = docs.slice(i, i + 450);
+                        const writeBatch = db.batch();
+                        chunk.forEach(doc => {
+                            const id = doc._id;
+                            const data = { ...doc };
+                            delete data._id;
+                            writeBatch.set(db.collection(colName).doc(id), data);
+                        });
+                        await writeBatch.commit();
+                    }
+                }
+                showToast('Backup erfolgreich wiederhergestellt! Seite wird neu geladen...', 'success', 3000);
+                setTimeout(() => location.reload(), 2000);
+            } catch(e) { showToast('Fehler: ' + e.message, 'error'); }
+        },
+        true
+    );
+}
+
+function updateBackupInfo() {
+    const el = document.getElementById('backupInfo');
+    if (!el) return;
+    const lastDownload = localStorage.getItem('lastBackupDownload');
+    if (lastDownload) {
+        const d = new Date(lastDownload);
+        const diffDays = Math.floor((Date.now() - d.getTime()) / 86400000);
+        el.innerHTML = `Letztes Backup: <b>${d.toLocaleDateString('de-AT')}</b> (vor ${diffDays} Tagen)`;
+        if (diffDays >= 7) {
+            el.innerHTML += '<br><span style="color:var(--red);font-weight:600">Backup empfohlen!</span>';
+        }
+    } else {
+        el.innerHTML = '<span style="color:var(--red);font-weight:600">Noch kein Backup heruntergeladen!</span>';
+    }
+}
+
+function checkBackupReminder() {
+    if (!isSuperAdmin()) return;
+    const lastDownload = localStorage.getItem('lastBackupDownload');
+    const daysSince = lastDownload ? Math.floor((Date.now() - new Date(lastDownload).getTime()) / 86400000) : 999;
+    if (daysSince >= 7) {
+        setTimeout(() => {
+            showToast('Backup empfohlen! Letztes Backup vor ' + (daysSince >= 999 ? 'nie' : daysSince + ' Tagen') + '. Gehe zu Einstellungen → Datensicherung.', 'warning', 6000);
+        }, 3000);
+    }
+}
+
+// Show backup card only for superadmin/admin
+function initBackupCard() {
+    const card = document.getElementById('backupCard');
+    if (card && (isSuperAdmin() || isAdmin())) {
+        card.style.display = 'block';
+        updateBackupInfo();
+    }
+}
+
+// ═══ PUSH NOTIFICATIONS ═══
+let pushEnabled = false;
+
+async function initPushNotifications() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+    if (Notification.permission === 'granted') {
+        pushEnabled = true;
+    }
+}
+
+async function requestPushPermission() {
+    if (!('Notification' in window)) {
+        showToast('Dieser Browser unterstützt keine Benachrichtigungen.', 'warning');
+        return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+        pushEnabled = true;
+        showToast('Benachrichtigungen aktiviert!', 'success');
+        // Save preference
+        if (currentUser) {
+            db.collection('members').doc(currentUser.uid).update({
+                pushEnabled: true
+            }).catch(console.error);
+        }
+    } else {
+        showToast('Benachrichtigungen wurden abgelehnt.', 'warning');
+    }
+}
+
+function sendLocalNotification(title, body) {
+    if (!pushEnabled || Notification.permission !== 'granted') return;
+    try {
+        new Notification(title, {
+            body: body,
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-192.png',
+            vibrate: [200, 100, 200]
+        });
+    } catch (e) {
+        // Fallback for mobile: use service worker
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(title, {
+                    body: body,
+                    icon: '/icons/icon-192.png',
+                    vibrate: [200, 100, 200]
+                });
+            });
+        }
+    }
+}
+
+// Notify on new orders (listen for additions)
+let lastOrderCount = 0;
+function checkNewOrders() {
+    if (!pushEnabled) return;
+    const currentCount = orders.filter(o => o.column === 'Bestellung').length;
+    if (lastOrderCount > 0 && currentCount > lastOrderCount) {
+        const newest = orders.filter(o => o.column === 'Bestellung')[0];
+        if (newest) {
+            sendLocalNotification('Neue Bestellung!',
+                `${newest.vorname || ''} ${newest.nachname || ''} – ${(newest.measures || []).length} Artikel`
+            );
+        }
+    }
+    lastOrderCount = currentCount;
+}
+
+// v1.18.9-phase5c: subscribeOrders ist jetzt in 07-board.js definiert und
+// enthält direkt die Push-Notification-Logik (checkNewOrders). Der frühere
+// Monkey-Patch hier wurde entfernt — siehe 07-board.js.
+
+initPushNotifications();
+
+
+// ═══ PWA SERVICE WORKER + AUTO UPDATE ═══
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+        // Check for updates every 30 seconds
+        setInterval(() => reg.update(), 900000);
+        // When new SW is available, prompt user
+        reg.addEventListener('updatefound', () => {
+            const newSW = reg.installing;
+            newSW.addEventListener('statechange', () => {
+                if (newSW.state === 'activated') {
+                    showUpdateBanner();
+                }
+            });
+        });
+    }).catch(e => console.log('SW:', e));
+}
+
+// Update banner
+function showUpdateBanner() {
+    if (document.getElementById('updateBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'updateBanner';
+    banner.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--primary);color:white;padding:24px 28px;border-radius:16px;font-size:16px;font-weight:600;font-family:inherit;z-index:9999;display:flex;flex-direction:column;align-items:center;gap:14px;box-shadow:0 12px 40px rgba(0,0,0,0.3);max-width:85%;text-align:center;';
+    banner.innerHTML = '<div style="font-size:18px;font-weight:700">Neue Version verfügbar</div><div style="font-size:13px;opacity:0.8">Die App wurde aktualisiert.</div><button onclick="location.reload()" style="background:white;color:var(--primary);border:none;border-radius:10px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">Jetzt aktualisieren</button>';
+    document.body.appendChild(banner);
+}
+
+// Check version on page load (for PWA that doesn't get SW updates)
+window.addEventListener('pageshow', () => {
+    const lastVersion = localStorage.getItem('app_version');
+    if (lastVersion && lastVersion !== APP_VERSION) {
+        // Force reload cached resources
+        if ('caches' in window) {
+            caches.keys().then(keys => {
+                keys.forEach(k => caches.delete(k));
+            });
+        }
+        localStorage.setItem('app_version', APP_VERSION);
+        location.reload();
+    } else {
+        localStorage.setItem('app_version', APP_VERSION);
+    }
+});
+
+// ═══ PULL TO REFRESH (v1.16.8-p3 deaktiviert) ═══
+// Pull-to-Refresh ist nicht mehr nötig — Firestore aktualisiert live über onSnapshot
+// Falls manuelles Reload nötig: Browser-Refresh (Cmd+R) oder Service Worker Cache leeren
+</script>
+<script src="js/03-auth.js"></script>
+<script src="js/04-stock.js"></script>
+<script src="js/05-output.js"></script>
+<script src="js/06-stammdaten.js"></script>
+<script src="js/07-board.js"></script>
+<script src="js/08-order.js"></script>
+<script src="js/09-prodstats.js"></script>
+<script src="js/10-search.js"></script>
+
+<!-- v1.18.15: Suche-Overlay (separates Modal über dem Board) -->
+<div id="searchOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:20px 10px;backdrop-filter:blur(2px)" onclick="if(event.target===this)closeSearchOverlay()">
+    <div style="background:var(--card);border-radius:16px;width:100%;max-width:520px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,0.3);overflow:hidden">
+        <!-- Header mit Suchfeld -->
+        <div style="padding:14px 14px 10px;border-bottom:1px solid var(--border-light);flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:8px">
+                <span style="color:var(--text-muted);flex-shrink:0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </span>
+                <input type="text" id="searchOverlayInput" placeholder="Name, Telefon, Bestellnummer, Maße..."
+                    oninput="renderSearchResults(this.value)"
+                    onkeydown="handleSearchKeydown(event)"
+                    style="flex:1;padding:8px 0;font-size:16px;border:none;outline:none;background:transparent;font-family:inherit;font-weight:600">
+                <button onclick="closeSearchOverlay()" aria-label="Schließen"
+                    style="background:var(--border-light);border:none;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary);flex-shrink:0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div id="searchOverlayCount" style="margin-top:8px;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.04em"></div>
+        </div>
+        <!-- Results-Liste (scrollbar) -->
+        <div id="searchOverlayResults" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>
+    </div>
+</div>
+
+</body>
+</html>
