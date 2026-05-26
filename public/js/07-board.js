@@ -464,22 +464,49 @@ async function quickMove(id, toCol) {
 
     // Confirmation dialog for all moves
     const kundenName = ((o.vorname||'') + ' ' + (o.nachname||'')).trim() || 'Unbekannt';
-    showConfirm('Verschieben?', '"' + escHtml(kundenName) + '" wird nach "' + toCol + '" verschoben.', 'Verschieben', async () => {
-        await doQuickMove(id, toCol, o);
+
+    // Bei Online-Bestellungen sollen diese Status-Wechsel eine Status-Email an den
+    // Kunden auslösen (Versand erfolgt serverseitig). Sicherheitsnetz: Mitarbeiter
+    // warnen + Möglichkeit das Senden zu unterdrücken, damit eine falsche
+    // Verschiebung nicht direkt beim Kunden landet.
+    const STATUS_TRIGGERS_EMAIL = ['In Produktion','Abholbereit','Abgeholt'];
+    const willTriggerEmail = o.source === 'online' && STATUS_TRIGGERS_EMAIL.includes(toCol);
+
+    let confirmBody = '"' + escHtml(kundenName) + '" wird nach "' + toCol + '" verschoben.';
+    if (willTriggerEmail) {
+        confirmBody += '<div style="margin-top:14px;padding:12px 14px;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;text-align:left">' +
+            '<div style="font-size:13px;color:#92400e;font-weight:700;margin-bottom:6px">⚠️ Achtung — Online-Bestellung</div>' +
+            '<div style="font-size:13px;color:#78350f;margin-bottom:10px">Der Kunde bekommt automatisch eine Status-Email zu "' + escHtml(toCol) + '".</div>' +
+            '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#78350f;font-weight:600">' +
+            '<input type="checkbox" id="sendStatusEmailCheckbox" checked style="width:18px;height:18px;accent-color:#92400e">' +
+            'Email senden' +
+            '</label></div>';
+    }
+
+    showConfirm('Verschieben?', confirmBody, 'Verschieben', async () => {
+        const sendEmail = willTriggerEmail ? !!document.getElementById('sendStatusEmailCheckbox')?.checked : true;
+        await doQuickMove(id, toCol, o, { sendEmail });
     }, false);
 }
 
-async function doQuickMove(id, toCol, o) {
+async function doQuickMove(id, toCol, o, opts) {
     // Auto-deduct inventory when moving to Abholbereit
     if (toCol === 'Abholbereit' && o.column !== 'Abholbereit') {
         try { await deductInventory(o); } catch(e) { console.error('Inventory deduction error:', e); }
     }
 
+    // Flag wird vom serverseitigen Email-Versand gelesen, um den Versand zu überspringen,
+    // wenn der Mitarbeiter die "Email senden"-Checkbox deaktiviert hat (nur bei Online-Bestellungen).
+    const skipEmail = opts && opts.sendEmail === false;
+    const moveLogText = `${getUserName()} hat Bestellung von ${o.column} nach ${toCol} verschoben`
+        + (skipEmail ? ' (Email-Versand unterdrückt)' : '');
+
     const updateData = {
         column: toCol,
+        skipNotifyEmail: skipEmail,
         log: firebase.firestore.FieldValue.arrayUnion({
             time: firebase.firestore.Timestamp.now(),
-            text: `${getUserName()} hat Bestellung von ${o.column} nach ${toCol} verschoben`
+            text: moveLogText
         })
     };
 
