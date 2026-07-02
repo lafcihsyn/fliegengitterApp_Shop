@@ -21,6 +21,152 @@
 //   - cachedMaterials, cachedColors, currentUserFiliale, etc. (inline)
 // ═══════════════════════════════════════════════════════════════════
 
+// v1.19.12: m²-Vorschau im Netz-Wareneingang live updaten
+function updateNetzM2Preview() {
+    const anz = parseInt(document.getElementById('weNetzAnzahl')?.value) || 0;
+    const lng = parseFloat(document.getElementById('weNetzLaenge')?.value) || 0;
+    const bcm = parseFloat(document.getElementById('weNetzBreite')?.value) || 0;
+    const previewEl = document.getElementById('weNetzM2Preview');
+    if (!previewEl) return;
+    if (anz && lng && bcm) {
+        const m2PerPaket = (bcm / 100) * lng;
+        const totalM2 = anz * m2PerPaket;
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = `<strong>m² gesamt:</strong> ${anz} × (${bcm} cm × ${lng} m) = <strong>${totalM2.toFixed(1)} m²</strong> (≈${m2PerPaket.toFixed(1)} m²/Paket)`;
+    } else {
+        previewEl.style.display = 'none';
+    }
+}
+
+// ═══ HELPER: Lagerbestand mit Inventur als Nullpunkt (v1.19.11) ═══
+//
+// Vor der Umstellung: Soll-Bestand = Σ Wareneingang − Σ Verbrauch (über alle
+// Zeit). Verschnitt, Schwund, Zählfehler blieben dauerhaft drin.
+//
+// Jetzt: Wenn eine Inventur existiert, gilt der gezählte Ist-Bestand als
+// Nullpunkt. Eingänge/Verbrauch werden nur ab dem Inventur-Datum (exklusiv)
+// dazugerechnet — alles davor ist im Ist-Bestand bereits enthalten.
+//
+// Liefert pro Material+Farbe-Key:
+//   { eingang: {meter, falten, stueck, stangen}, ausgang: <Zahl>,
+//     checkIst: <Zahl|0>, checkDatum: '<YYYY-MM-DD>'|'' }
+function computeStockBalance(inDocs, outDocs, checkDocs) {
+    // 1. Pro Key das jüngste inventory_check-Datum + Ist-Bestand bestimmen
+    const lastCheck = {}; // key → { datum, istBestand }
+    (checkDocs || []).forEach(d => {
+        const inv = d.data ? d.data() : d;
+        if (!Array.isArray(inv.items)) return;
+        const cd = inv.datum || '';
+        inv.items.forEach(item => {
+            if (!item || !item.key) return;
+            const cur = lastCheck[item.key];
+            if (!cur || cd > (cur.datum || '')) {
+                lastCheck[item.key] = { datum: cd, istBestand: parseFloat(item.istBestand) || 0 };
+            }
+        });
+    });
+
+    const balance = {};
+    const ensure = key => {
+        if (!balance[key]) balance[key] = {
+            eingang: { meter: 0, falten: 0, stueck: 0, stangen: 0, m2: 0 },
+            ausgang: 0,
+            checkIst: 0,
+            checkDatum: ''
+        };
+        return balance[key];
+    };
+
+    // 2. Checks als Startwert übernehmen
+    Object.entries(lastCheck).forEach(([key, chk]) => {
+        const b = ensure(key);
+        b.checkIst = chk.istBestand;
+        b.checkDatum = chk.datum;
+    });
+
+    // 3. Eingänge nur ab/nach letztem Check dazuzählen
+    (inDocs || []).forEach(d => {
+        const e = d.data ? d.data() : d;
+        const key = e.materialId + (e.farbe ? '_' + e.farbe : '');
+        const chk = lastCheck[key];
+        if (chk && (e.datum || '') <= chk.datum) return; // im Ist-Bestand bereits berücksichtigt
+        const b = ensure(key);
+        if (e.details?.totalMeter) b.eingang.meter += e.details.totalMeter;
+        if (e.details?.totalFalten) b.eingang.falten += e.details.totalFalten;
+        if (e.details?.totalM2) b.eingang.m2 += e.details.totalM2;
+        if (e.details?.anzahl) b.eingang.stangen += e.details.anzahl;
+        b.eingang.stueck += e.menge || 0;
+    });
+
+    // 4. Verbrauch ebenfalls nur ab/nach Check
+    (outDocs || []).forEach(d => {
+        const e = d.data ? d.data() : d;
+        const key = e.materialId + (e.farbe ? '_' + e.farbe : '');
+        const chk = lastCheck[key];
+        if (chk && (e.datum || '') <= chk.datum) return;
+        const b = ensure(key);
+        b.ausgang += e.verbrauch || 0;
+    });
+
+    return balance;
+}
+
+// Helfer: für einen Material+Farbe-Key den Soll-Bestand je Typ ableiten.
+function sollFromBalance(matType, balData) {
+    const d = balData || {};
+    const ein = d.eingang || {};
+    const aus = d.ausgang || 0;
+    const start = d.checkIst || 0;
+    if (matType === 'stange')   return start + (ein.meter || 0) - aus;
+    // Netz: wenn m² erfasst wurden (v1.19.12), nutze diese; sonst Legacy-Falten-Logik
+    if (matType === 'netz') {
+        if ((ein.m2 || 0) > 0) return start + (ein.m2 || 0) - aus;
+        return start + (ein.falten || 0) - aus;
+    }
+    if (matType === 'rolle' ||
+        matType === 'flaeche')  return start + (ein.meter || 0) - aus;
+    if (matType === 'stueck')   return start + (ein.stueck || 0) - aus;
+    return start + (ein.stueck || 0) - aus;
+}
+
+// Helfer: gibt die für ein Material relevanten „Achsen" zurück, über die der
+// Bestand getrennt geführt wird (Farben ODER Dimensionen ODER Netz-Breiten).
+// Wird in der Lager-Übersicht, Inventur und Bestellliste verwendet.
+//
+// Priorität (NICHT kombinierbar in Phase 1.5):
+//   1. Material mit dimensions[] → generische Dimensions-Labels (z.B. „67×700") ← v1.19.13 Default
+//   2. Netz mit netzBreiten[]   → Breiten als Labels (Legacy-Fallback bis migriert)
+//   3. Material mit byColor      → Farben (gefiltert auf Stammdaten)
+//   4. Sonst                      → ['']
+function getMatActiveColors(mat) {
+    if (!mat) return [''];
+    // 1. v1.19.13: Material mit generischen Dimensionen (alle Material-Typen) — höchste Priorität
+    if (Array.isArray(mat.dimensions) && mat.dimensions.length) {
+        const dims = mat.dimensions
+            .map(id => (typeof cachedMaterialDimensions !== 'undefined' ? cachedMaterialDimensions : []).find(d => d.id === id))
+            .filter(d => d && d.active !== false)
+            .map(d => d.label);
+        if (dims.length) return dims;
+    }
+    // 2. Legacy: Netz-Material mit Stammdaten-Breiten → Breiten als „Farben"
+    if (mat.type === 'netz' && Array.isArray(mat.netzBreiten) && mat.netzBreiten.length) {
+        const breiten = mat.netzBreiten
+            .map(id => (typeof cachedNetzBreiten !== 'undefined' ? cachedNetzBreiten : []).find(b => b.id === id))
+            .filter(b => b && b.active !== false)
+            .map(b => b.cm + ' cm');
+        return breiten.length ? breiten : [''];
+    }
+    // 3. Material mit Farben
+    if (!mat.byColor) return [''];
+    const raw = (mat.colors && mat.colors.length) ? mat.colors : [];
+    const validNames = new Set([
+        ...((typeof cachedColors !== 'undefined' ? cachedColors : []) || []).map(c => c.name),
+        ...((typeof cachedPlisseeColors !== 'undefined' ? cachedPlisseeColors : []) || []).map(c => c.name)
+    ]);
+    const filtered = raw.filter(c => validNames.has(c));
+    return filtered.length ? filtered : [''];
+}
+
 // ═══ WARENEINGANG ═══
 let weMaterials = [];
 
@@ -59,8 +205,20 @@ function onWeMaterialChange() {
     if (m.byColor) {
         document.getElementById('weColorField').style.display = 'block';
         const colorSel = document.getElementById('weColor');
-        const matColors = m.colors && m.colors.length ? m.colors : ['Antrazit', 'Weiß', 'Braun'];
-        colorSel.innerHTML = matColors.map(c => `<option value="${c}">${c}</option>`).join('');
+        // Nur Farben anzeigen, die wirklich noch in den Stammdaten existieren
+        // (Profile-Farben ODER Plissee-Farben). So fliegen Altlasten wie das alte
+        // hardcoded „Braun" automatisch raus, ohne dass das Material erneut
+        // gespeichert werden muss.
+        const validNames = new Set([
+            ...((typeof cachedColors !== 'undefined' ? cachedColors : []) || []).map(c => c.name),
+            ...((typeof cachedPlisseeColors !== 'undefined' ? cachedPlisseeColors : []) || []).map(c => c.name)
+        ]);
+        const matColors = ((m.colors && m.colors.length) ? m.colors : []).filter(c => validNames.has(c));
+        if (!matColors.length) {
+            colorSel.innerHTML = '<option value="" disabled selected>Keine Farben definiert — bitte im Material pflegen</option>';
+        } else {
+            colorSel.innerHTML = matColors.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+        }
     }
 
     // Show type-specific fields
@@ -68,11 +226,73 @@ function onWeMaterialChange() {
         document.getElementById('weFieldsStange').style.display = 'block';
         document.getElementById('weLaenge').value = m.purchaseLength || 6;
         document.getElementById('weLengthLabel').textContent = 'Stangenlänge (m)';
-    } else if (m.type === 'netz') {
+    }
+    // v1.19.13: Generischer Dimensionen-Dropdown für ALLE Material-Typen außer Netz
+    // (Netz hat seinen eigenen Breite-Picker im m²-Pfad). Wenn das Material Dimensionen
+    // hat, wird der Dropdown gezeigt und sein Wert beim Speichern in das farbe-Feld
+    // geschrieben, damit Lager+Inventur pro Dimension getrennt sind.
+    const dimWrap = document.getElementById('weDimensionField');
+    const dimSel = document.getElementById('weDimension');
+    if (dimWrap && dimSel) {
+        if (m.type !== 'netz' && Array.isArray(m.dimensions) && m.dimensions.length) {
+            const dims = m.dimensions
+                .map(id => (cachedMaterialDimensions || []).find(d => d.id === id))
+                .filter(d => d && d.active !== false);
+            if (dims.length) {
+                dimWrap.style.display = 'block';
+                dimSel.innerHTML = dims.map(d => `<option value="${escHtml(d.label)}">${escHtml(d.label)}</option>`).join('');
+            } else {
+                dimWrap.style.display = 'none';
+            }
+        } else {
+            dimWrap.style.display = 'none';
+        }
+    }
+    if (m.type === 'netz') {
         document.getElementById('weFieldsNetz').style.display = 'block';
-        const hoehenSel = document.getElementById('weNetzHoehe');
-        const hoehen = m.netzHoehen || [225, 250, 300, 325];
-        hoehenSel.innerHTML = hoehen.map(h => `<option value="${h}">${h} cm</option>`).join('');
+
+        // v1.19.13: Bevorzugt Material-Dimensionen[] (neuer Weg); Fallback auf netzBreiten[] (Legacy).
+        // Beide werden zu einer Liste {cm, name?}-Objekten normalisiert, damit der m²-Pfad
+        // einheitlich greift.
+        let breiten = [];
+        if (Array.isArray(m.dimensions) && m.dimensions.length) {
+            breiten = m.dimensions
+                .map(id => (cachedMaterialDimensions || []).find(d => d.id === id))
+                .filter(d => d && d.active !== false)
+                .map(d => {
+                    // Label „240 cm" → cm:240; „300 cm" → cm:300; sonst label als String halten
+                    const match = /(\d+(\.\d+)?)/.exec(d.label || '');
+                    const cm = match ? parseFloat(match[1]) : 0;
+                    return { cm, name: d.label };
+                })
+                .filter(b => b.cm > 0);
+        } else {
+            const breitenIds = Array.isArray(m.netzBreiten) ? m.netzBreiten : [];
+            breiten = breitenIds
+                .map(id => (cachedNetzBreiten || []).find(b => b.id === id))
+                .filter(b => b && b.active !== false);
+        }
+
+        const breiteWrap = document.getElementById('weFieldsNetzBreite');
+        const breiteSel = document.getElementById('weNetzBreite');
+        const legacyWrap = document.getElementById('weFieldsNetzLegacy');
+
+        if (breiten.length) {
+            // Neue m²-basierte Erfassung
+            breiteWrap.style.display = 'block';
+            legacyWrap.style.display = 'none';
+            breiteSel.innerHTML = breiten.map(b => `<option value="${b.cm}">${b.cm} cm${b.name && b.name !== (b.cm+' cm') ? ' — '+escHtml(b.name) : ''}</option>`).join('');
+            // Default-Länge falls vorhanden
+            if (m.purchaseLength) document.getElementById('weNetzLaenge').value = m.purchaseLength;
+            updateNetzM2Preview();
+        } else {
+            // Altes Verhalten — Faltenanzahl/Höhe (für Materialien ohne Stammdaten-Breiten)
+            breiteWrap.style.display = 'none';
+            legacyWrap.style.display = 'block';
+            const hoehenSel = document.getElementById('weNetzHoehe');
+            const hoehen = m.netzHoehen || [225, 250, 300, 325];
+            hoehenSel.innerHTML = hoehen.map(h => `<option value="${h}">${h} cm</option>`).join('');
+        }
     } else if (m.type === 'rolle') {
         document.getElementById('weFieldsRolle').style.display = 'block';
     } else if (m.type === 'flaeche') {
@@ -94,7 +314,19 @@ async function saveWareneingang() {
     const preis = parseFloat(document.getElementById('wePreis').value) || 0;
     const lieferant = document.getElementById('weLieferant').value.trim();
     const bemerkung = document.getElementById('weBemerkung').value.trim();
-    const farbe = m.byColor ? document.getElementById('weColor').value : '';
+    // v1.19.12 / v1.19.13: Bei Netz-Materialien wird die Breite (cm) in das `farbe`-Feld
+    // geschrieben; bei anderen Material-Typen mit Dimensionen die gewählte Dimension.
+    // So funktioniert der bestehende Material+Farbe-Key-Mechanismus auch für
+    // Material+Größe (Lager getrennt geführt). Materialien sind in der Regel nicht
+    // gleichzeitig byColor — falls nötig später erweitern.
+    let farbe = m.byColor ? document.getElementById('weColor').value : '';
+    if (m.type === 'netz' && Array.isArray(m.netzBreiten) && m.netzBreiten.length) {
+        const breiteCm = parseFloat(document.getElementById('weNetzBreite').value) || 0;
+        if (breiteCm) farbe = breiteCm + ' cm';
+    } else if (Array.isArray(m.dimensions) && m.dimensions.length) {
+        const dimVal = (document.getElementById('weDimension')?.value || '').trim();
+        if (dimVal) farbe = dimVal;
+    }
 
     let menge = 0, einheit = '', details = {};
 
@@ -107,12 +339,29 @@ async function saveWareneingang() {
         details = { anzahl, laenge, totalMeter: anzahl * laenge };
     } else if (m.type === 'netz') {
         const anzahl = parseInt(document.getElementById('weNetzAnzahl').value) || 0;
-        const falten = parseInt(document.getElementById('weNetzFalten').value) || 0;
-        const hoehe = parseFloat(document.getElementById('weNetzHoeheCustom').value) || parseFloat(document.getElementById('weNetzHoehe').value) || 0;
-        if (!anzahl || !falten) { showToast('Bitte Anzahl und Falten eingeben.', 'warning'); return; }
-        menge = anzahl;
-        einheit = 'Rollen';
-        details = { anzahl, faltenProRolle: falten, totalFalten: anzahl * falten, hoehe };
+        // v1.19.12: Wenn Material Breiten hat → m²-basierte Erfassung
+        // v1.19.13: Dimensions[] hat Priorität gegenüber netzBreiten[]
+        const hasBreiten = (Array.isArray(m.dimensions) && m.dimensions.length > 0)
+            || (Array.isArray(m.netzBreiten) && m.netzBreiten.length > 0);
+        if (hasBreiten) {
+            const breiteCm = parseFloat(document.getElementById('weNetzBreite').value) || 0;
+            const paketLaenge = parseFloat(document.getElementById('weNetzLaenge').value) || 0;
+            if (!anzahl || !breiteCm || !paketLaenge) {
+                showToast('Bitte Anzahl, Breite und Paket-Länge eingeben.', 'warning'); return;
+            }
+            const totalM2 = anzahl * (breiteCm / 100) * paketLaenge;
+            menge = anzahl;
+            einheit = 'Pakete';
+            details = { anzahl, breite: breiteCm, paketLaenge, totalM2: parseFloat(totalM2.toFixed(2)) };
+        } else {
+            // Legacy-Pfad (Falten-basiert)
+            const falten = parseInt(document.getElementById('weNetzFalten').value) || 0;
+            const hoehe = parseFloat(document.getElementById('weNetzHoeheCustom').value) || parseFloat(document.getElementById('weNetzHoehe').value) || 0;
+            if (!anzahl || !falten) { showToast('Bitte Anzahl und Falten eingeben.', 'warning'); return; }
+            menge = anzahl;
+            einheit = 'Rollen';
+            details = { anzahl, faltenProRolle: falten, totalFalten: anzahl * falten, hoehe };
+        }
     } else if (m.type === 'rolle') {
         const anzahl = parseInt(document.getElementById('weRolleAnzahl').value) || 0;
         const meter = parseFloat(document.getElementById('weRolleMeter').value) || 0;
@@ -175,13 +424,20 @@ async function editWareneingang(id) {
                 <button onclick="this.closest('.confirm-overlay').remove()" style="background:var(--border-light);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div class="edit-field"><label>Menge</label><input type="number" id="weEditMenge" value="${e.menge || 0}" step="0.1"></div>
-            ${e.farbe ? `<div class="edit-field"><label>Farbe</label>
-                <select id="weEditFarbe" style="width:100%;padding:10px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
-                    <option value="Antrazit"${e.farbe==='Antrazit'?' selected':''}>Antrazit</option>
-                    <option value="Weiß"${e.farbe==='Weiß'?' selected':''}>Weiß</option>
-                    <option value="Braun"${e.farbe==='Braun'?' selected':''}>Braun</option>
-                </select>
-            </div>` : ''}
+            ${(() => {
+                if (!e.farbe) return '';
+                // Material-spezifische Farben aus dem zugehörigen Material lesen;
+                // Fallback auf die im Eintrag gespeicherte Farbe damit die alte Auswahl
+                // sichtbar bleibt, auch wenn sie aus den Stammdaten entfernt wurde.
+                const matInfo = (cachedMaterials || []).find(x => x.id === e.materialId || x.name === e.materialName);
+                let opts = (matInfo && matInfo.colors && matInfo.colors.length) ? [...matInfo.colors] : [];
+                if (!opts.includes(e.farbe)) opts.unshift(e.farbe);
+                return `<div class="edit-field"><label>Farbe</label>
+                    <select id="weEditFarbe" style="width:100%;padding:10px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                        ${opts.map(c => `<option value="${escHtml(c)}"${e.farbe===c?' selected':''}>${escHtml(c)}</option>`).join('')}
+                    </select>
+                </div>`;
+            })()}
             ${d.totalMeter !== undefined ? `<div class="edit-field"><label>Gesamt Meter</label><input type="number" id="weEditMeter" value="${d.totalMeter || 0}" step="0.1"></div>` : ''}
             ${d.totalFalten !== undefined ? `<div class="edit-field"><label>Gesamt Falten</label><input type="number" id="weEditFalten" value="${d.totalFalten || 0}"></div>` : ''}
             ${d.hoehe !== undefined ? `<div class="edit-field"><label>Höhe (cm)</label><input type="number" id="weEditHoehe" value="${d.hoehe || 0}" step="0.5"></div>` : ''}
@@ -285,30 +541,23 @@ async function loadWareneingaenge() {
 // ═══ BESTANDSÜBERSICHT ═══
 async function exportBestellliste(format) {
     try {
-        const [matSnap, inSnap, outSnap] = await Promise.all([
+        const [matSnap, inSnap, outSnap, checkSnap] = await Promise.all([
             db.collection('materials').orderBy('sortOrder').get(),
             db.collection('inventory_in').get(),
-            db.collection('inventory_out').get()
+            db.collection('inventory_out').get(),
+            db.collection('inventory_check').get()
         ]);
 
         const materials = matSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const eingang = {}, ausgang = {};
-        inSnap.docs.forEach(d => { const e = d.data(); const k = e.materialId + (e.farbe?'_'+e.farbe:''); if(!eingang[k]) eingang[k]={meter:0,falten:0,stueck:0}; if(e.details?.totalMeter) eingang[k].meter+=e.details.totalMeter; if(e.details?.totalFalten) eingang[k].falten+=e.details.totalFalten; eingang[k].stueck+=e.menge||0; });
-        outSnap.docs.forEach(d => { const e = d.data(); const k = e.materialId + (e.farbe?'_'+e.farbe:''); if(!ausgang[k]) ausgang[k]=0; ausgang[k]+=e.verbrauch||0; });
+        const balance = computeStockBalance(inSnap.docs, outSnap.docs, checkSnap.docs);
 
         let lowItems = [];
         materials.forEach(mat => {
             if (!mat.active || (!mat.minStock && !mat.minStockFalten)) return;
-            const farben = mat.byColor ? (mat.colors && mat.colors.length ? mat.colors : ['Antrazit', 'Weiß', 'Braun']) : [''];
+            const farben = getMatActiveColors(mat);
             farben.forEach(farbe => {
                 const k = mat.id + (farbe?'_'+farbe:'');
-                const ein = eingang[k] || {};
-                const aus = ausgang[k]?.verbrauch || ausgang[k] || 0;
-                let bestand = 0;
-                if (mat.type === 'stange') bestand = (ein.meter||0) - aus;
-                else if (mat.type === 'netz') bestand = (ein.falten||0) - aus;
-                else if (mat.type === 'rolle' || mat.type === 'flaeche') bestand = (ein.meter||0) - aus;
-                else bestand = (ein.stueck||0) - aus;
+                const bestand = sollFromBalance(mat.type, balance[k]);
 
                 const minVal = mat.type === 'netz' ? (mat.minStockFalten||0) : (mat.minStock||0);
                 if (bestand < minVal) {
@@ -389,85 +638,50 @@ async function loadBestandsuebersicht() {
             db.collection('materials').orderBy('sortOrder').get(),
             db.collection('inventory_in').get(),
             db.collection('inventory_out').get(),
-            db.collection('inventory_check').orderBy('createdAt', 'desc').limit(1).get()
+            db.collection('inventory_check').get()
         ]);
 
         const materials = matSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const lastCheck = checkSnap.empty ? null : checkSnap.docs[0].data();
-        const lastCheckDate = lastCheck ? lastCheck.datum : null;
-
-        // Calculate Eingang totals per material+farbe
-        const eingang = {};
-        inSnap.docs.forEach(d => {
-            const e = d.data();
-            const key = e.materialId + (e.farbe ? '_' + e.farbe : '');
-            if (!eingang[key]) eingang[key] = { meter: 0, stangen: 0, falten: 0, stueck: 0, rollen: 0 };
-            if (e.details?.totalMeter) eingang[key].meter += e.details.totalMeter;
-            if (e.details?.totalFalten) eingang[key].falten += e.details.totalFalten;
-            if (e.details?.anzahl) eingang[key].stangen += e.details.anzahl;
-            eingang[key].stueck += e.menge || 0;
+        // v1.19.11: Soll-Bestand wird ab letzter Inventur neu gerechnet.
+        const balance = computeStockBalance(inSnap.docs, outSnap.docs, checkSnap.docs);
+        // Letzte Inventur für die History-Anzeige unten
+        let lastCheckDate = null;
+        checkSnap.docs.forEach(d => {
+            const dt = d.data().datum || '';
+            if (!lastCheckDate || dt > lastCheckDate) lastCheckDate = dt;
         });
-
-        // Calculate Ausgang totals per material+farbe
-        const ausgang = {};
-        outSnap.docs.forEach(d => {
-            const e = d.data();
-            const key = e.materialId + (e.farbe ? '_' + e.farbe : '');
-            if (!ausgang[key]) ausgang[key] = { verbrauch: 0 };
-            ausgang[key].verbrauch += e.verbrauch || 0;
-        });
-
-        // Get last inventory values
-        const lastInv = {};
-        if (lastCheck && lastCheck.items) {
-            lastCheck.items.forEach(item => {
-                lastInv[item.key] = item.istBestand || 0;
-            });
-        }
 
         let html = '';
         materials.forEach(mat => {
             if (!mat.active) return;
-            const farben = mat.byColor ? (mat.colors && mat.colors.length ? mat.colors : ['Antrazit', 'Weiß', 'Braun']) : [''];
+            const farben = getMatActiveColors(mat);
 
             let matHtml = '';
             let hasData = false;
 
             farben.forEach(farbe => {
                 const key = mat.id + (farbe ? '_' + farbe : '');
-                const ein = eingang[key] || {};
-                const aus = ausgang[key] || {};
+                const bal = balance[key] || {};
+                const ein = bal.eingang || {};
+                const totalAus = bal.ausgang || 0;
+                const bestandValue = sollFromBalance(mat.type, bal);
 
-                let bestandValue = 0;
                 let einheitStr = '';
-                let totalEin = 0;
-                let totalAus = aus.verbrauch || 0;
-
                 if (mat.type === 'stange') {
-                    totalEin = (ein.meter || 0);
-                    bestandValue = totalEin - totalAus;
                     const stangen = mat.purchaseLength ? bestandValue / mat.purchaseLength : 0;
                     einheitStr = `${bestandValue.toFixed(1)}m (≈${stangen.toFixed(1)} Stg)`;
                 } else if (mat.type === 'netz') {
-                    totalEin = ein.falten || 0;
-                    bestandValue = totalEin - totalAus;
-                    einheitStr = `${bestandValue.toFixed(0)} Falten`;
+                    // v1.19.12: m² wenn Material mit Breiten-Stammdaten, sonst Legacy-Falten
+                    const isM2 = Array.isArray(mat.netzBreiten) && mat.netzBreiten.length;
+                    einheitStr = isM2 ? `${bestandValue.toFixed(1)} m²` : `${bestandValue.toFixed(0)} Falten`;
                 } else if (mat.type === 'rolle' || mat.type === 'flaeche') {
-                    totalEin = ein.meter || 0;
-                    bestandValue = totalEin - totalAus;
                     einheitStr = `${bestandValue.toFixed(1)}m`;
                 } else if (mat.type === 'stueck') {
-                    totalEin = ein.stueck || 0;
-                    bestandValue = totalEin - totalAus;
                     einheitStr = `${bestandValue.toFixed(0)} ${mat.unit || 'Stk'}`;
                 }
 
-                // Use last inventory as base if available
-                if (lastInv[key] !== undefined) {
-                    bestandValue = lastInv[key] - totalAus; // simplified: last inv - ausgang since then
-                }
-
-                if (totalEin > 0 || totalAus > 0 || lastInv[key] !== undefined) hasData = true;
+                const hasMovement = (ein.meter || ein.falten || ein.stueck || ein.stangen || totalAus || bal.checkIst);
+                if (hasMovement) hasData = true;
 
                 const isLow = mat.minStock && bestandValue < mat.minStock;
                 const isLowFalten = mat.minStockFalten && bestandValue < mat.minStockFalten;
@@ -519,61 +733,53 @@ async function initInventur() {
             db.collection('materials').orderBy('sortOrder').get(),
             db.collection('inventory_in').get(),
             db.collection('inventory_out').get(),
-            db.collection('inventory_check').orderBy('createdAt', 'desc').limit(1).get()
+            db.collection('inventory_check').get()
         ]);
 
         inventurMaterials = matSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const lastCheck = checkSnap.empty ? null : checkSnap.docs[0].data();
-
-        // Calculate Soll-Bestand
-        const eingang = {}, ausgang = {}, lastInv = {};
-        inSnap.docs.forEach(d => {
-            const e = d.data();
-            const key = e.materialId + (e.farbe ? '_' + e.farbe : '');
-            if (!eingang[key]) eingang[key] = { meter: 0, falten: 0, stueck: 0 };
-            if (e.details?.totalMeter) eingang[key].meter += e.details.totalMeter;
-            if (e.details?.totalFalten) eingang[key].falten += e.details.totalFalten;
-            eingang[key].stueck += e.menge || 0;
-        });
-        outSnap.docs.forEach(d => {
-            const e = d.data();
-            const key = e.materialId + (e.farbe ? '_' + e.farbe : '');
-            if (!ausgang[key]) ausgang[key] = 0;
-            ausgang[key] += e.verbrauch || 0;
-        });
-        if (lastCheck?.items) lastCheck.items.forEach(item => { lastInv[item.key] = item.istBestand || 0; });
+        // v1.19.11: Soll-Bestand = letzte Inventur + neue Eingänge − neuer Verbrauch
+        const balance = computeStockBalance(inSnap.docs, outSnap.docs, checkSnap.docs);
 
         let html = '';
         inventurMaterials.forEach(mat => {
             if (!mat.active) return;
-            const farben = mat.byColor ? (mat.colors && mat.colors.length ? mat.colors : ['Antrazit', 'Weiß', 'Braun']) : [''];
+            const farben = getMatActiveColors(mat);
 
             html += `<div style="font-size:15px;font-weight:700;margin-top:16px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--primary)">${mat.name}</div>`;
 
             farben.forEach(farbe => {
                 const key = mat.id + (farbe ? '_' + farbe : '');
-                const ein = eingang[key] || {};
-                const aus = ausgang[key] || 0;
+                const bal = balance[key] || {};
+                const sollBestand = sollFromBalance(mat.type, bal);
 
-                let sollBestand = 0;
                 let einheitStr = '';
+                const checkBadge = bal.checkDatum
+                    ? ` <span style="font-size:10px;color:var(--text-muted);font-weight:400">(seit Inv. ${bal.checkDatum.split('-').reverse().join('.')})</span>`
+                    : '';
                 if (mat.type === 'stange') {
-                    sollBestand = (ein.meter || 0) - aus;
                     const stg = mat.purchaseLength ? sollBestand / mat.purchaseLength : 0;
-                    einheitStr = `Soll: ${sollBestand.toFixed(1)}m (≈${stg.toFixed(1)} Stg)`;
+                    einheitStr = `Soll: ${sollBestand.toFixed(1)}m (≈${stg.toFixed(1)} Stg)${checkBadge}`;
                 } else if (mat.type === 'netz') {
-                    sollBestand = (ein.falten || 0) - aus;
-                    einheitStr = `Soll: ${sollBestand.toFixed(0)} Falten`;
+                    const isM2 = Array.isArray(mat.netzBreiten) && mat.netzBreiten.length;
+                    einheitStr = isM2
+                        ? `Soll: ${sollBestand.toFixed(1)} m²${checkBadge}`
+                        : `Soll: ${sollBestand.toFixed(0)} Falten${checkBadge}`;
                 } else if (mat.type === 'rolle' || mat.type === 'flaeche') {
-                    sollBestand = (ein.meter || 0) - aus;
-                    einheitStr = `Soll: ${sollBestand.toFixed(1)}m`;
+                    einheitStr = `Soll: ${sollBestand.toFixed(1)}m${checkBadge}`;
                 } else if (mat.type === 'stueck') {
-                    sollBestand = (ein.stueck || 0) - aus;
-                    einheitStr = `Soll: ${sollBestand.toFixed(0)} ${mat.unit || 'Stk'}`;
+                    einheitStr = `Soll: ${sollBestand.toFixed(0)} ${mat.unit || 'Stk'}${checkBadge}`;
                 }
 
                 const farbeLabel = farbe ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${{Antrazit:'#4a4a4a',Weiß:'#d4d4d4',Braun:'#8B4513'}[farbe]||'#999'}"></span> ${farbe}` : '';
-                const inputUnit = mat.type === 'stange' ? 'Meter' : (mat.type === 'netz' ? 'Falten' : (mat.type === 'stueck' ? (mat.unit||'Stk') : 'Meter'));
+                const isNetzM2 = mat.type === 'netz' && Array.isArray(mat.netzBreiten) && mat.netzBreiten.length;
+                const inputUnit = mat.type === 'stange' ? 'Meter'
+                    : (mat.type === 'netz' ? (isNetzM2 ? 'm²' : 'Falten')
+                    : (mat.type === 'stueck' ? (mat.unit||'Stk') : 'Meter'));
+                // Bei Stangen-Material kleinen Hinweis dazu: „× 6 m je Stange" — verhindert
+                // Missverständnis (Mitarbeiter zählt Stangen, muss aber Meter eintragen).
+                const stangeHint = (mat.type === 'stange' && mat.purchaseLength)
+                    ? `<span style="font-size:10px;color:var(--text-muted);margin-left:4px">(× ${mat.purchaseLength}m je Stg)</span>`
+                    : '';
 
                 html += `<div style="padding:8px 0;border-bottom:1px solid var(--border-light)">
                     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
@@ -583,7 +789,7 @@ async function initInventur() {
                     <div style="display:flex;align-items:center;gap:8px">
                         <label style="font-size:12px;color:var(--text-secondary);min-width:25px">Ist:</label>
                         <input type="number" data-inv-key="${key}" data-inv-soll="${sollBestand}" step="0.1" placeholder="Gezählt..." style="flex:1;padding:8px 10px;font-size:14px;border:2px solid var(--border);border-radius:8px;font-family:inherit">
-                        <span style="font-size:12px;color:var(--text-muted);min-width:40px">${inputUnit}</span>
+                        <span style="font-size:12px;color:var(--text-muted);min-width:40px">${inputUnit}${stangeHint}</span>
                     </div>
                 </div>`;
             });
@@ -664,8 +870,13 @@ async function loadInventurHistory() {
 }
 
 // ═══ B-WARE CHECK ═══
-function checkBWare(breite, hoehe, farbe) {
-    if (!hasPerm('bware_check')) return;
+// v1.19.42: modelId-Parameter — B-Ware wird nur für passendes Modell vorgeschlagen.
+// Legacy-B-Ware ohne modelId wird ebenfalls vorgeschlagen (bis manuell migriert).
+function checkBWare(breite, hoehe, farbe, modelId) {
+    if (!hasPerm('bware_check')) {
+        console.log('[checkBWare] aborted: no permission');
+        return;
+    }
     // Don't check if no real values entered
     if (!breite || !hoehe || breite <= 0 || hoehe <= 0) {
         ['bwareAlert', 'rechnerBwareAlert'].forEach(id => {
@@ -675,27 +886,35 @@ function checkBWare(breite, hoehe, farbe) {
         return;
     }
     const bwareOrders = orders.filter(o => o.column === 'B-Ware');
-    if (!bwareOrders.length) return;
+    console.log('[checkBWare]', { breite, hoehe, farbe, modelId, bwareTotalInDB: bwareOrders.length });
+    if (!bwareOrders.length) {
+        console.log('[checkBWare] no B-Ware items in DB');
+        return;
+    }
 
     const matches = [];
+    const skipped = [];
     bwareOrders.forEach(bw => {
         (bw.measures || []).forEach(m => {
             const bwBreite = parseFloat(m.breite) || 0;
             const bwHoehe = parseFloat(m.hoehe) || 0;
             const bwFarbe = m.farbe || bw.farbe || '';
-            if (!bwBreite || !bwHoehe) return;
+            if (!bwBreite || !bwHoehe) { skipped.push({orderNumber: bw.orderNumber, reason: 'no maße'}); return; }
 
             // Farbe muss übereinstimmen
-            if (farbe && bwFarbe && farbe !== bwFarbe) return;
+            if (farbe && bwFarbe && farbe !== bwFarbe) { skipped.push({orderNumber: bw.orderNumber, reason: `farbe ${bwFarbe} !== ${farbe}`}); return; }
+
+            // v1.19.42: Modell muss übereinstimmen (oder Legacy-B-Ware ohne modelId)
+            if (modelId && m.modelId && m.modelId !== modelId) { skipped.push({orderNumber: bw.orderNumber, reason: `model ${m.modelId} !== ${modelId}`}); return; }
 
             // B-Ware muss GRÖSSER sein als die Bestellung (zum Zuschneiden)
             // aber maximal 25% größer (kein Verschnitt)
             // B-Ware Breite/Höhe >= Bestellung Breite/Höhe
-            if (bwBreite < breite || bwHoehe < hoehe) return; // B-Ware zu klein
+            if (bwBreite < breite || bwHoehe < hoehe) { skipped.push({orderNumber: bw.orderNumber, reason: `zu klein ${bwBreite}x${bwHoehe} < ${breite}x${hoehe}`}); return; }
             const breiteGroesser = (bwBreite - breite) / breite; // wie viel % größer
             const hoeheGroesser = (bwHoehe - hoehe) / hoehe;
-            if (breiteGroesser > 0.25) return; // zu viel größer
-            if (hoeheGroesser > 0.25) return;  // zu viel größer
+            if (breiteGroesser > 0.25) { skipped.push({orderNumber: bw.orderNumber, reason: `Breite >25% größer: ${(breiteGroesser*100).toFixed(0)}%`}); return; }
+            if (hoeheGroesser > 0.25) { skipped.push({orderNumber: bw.orderNumber, reason: `Höhe >25% größer: ${(hoeheGroesser*100).toFixed(0)}%`}); return; }
 
             // B-Ware Tül Adet muss >= Bestellung Tül Adet
             const enIdx = abzuege.findIndex(a => a.name === 'Profil En');
@@ -704,7 +923,7 @@ function checkBWare(breite, hoehe, farbe) {
             const newEnMass = breite - abzuege[enIdx].abzug;
             const newTuelAdet = newEnMass / 2;
 
-            if (bwTuelAdet < newTuelAdet) return;
+            if (bwTuelAdet < newTuelAdet) { skipped.push({orderNumber: bw.orderNumber, reason: `Tül-Adet zu klein: ${bwTuelAdet.toFixed(1)} < ${newTuelAdet.toFixed(1)}`}); return; }
 
             const tuelIdx = abzuege.findIndex(a => a.name === 'Tül');
             const bwTuelLen = bwHoehe - abzuege[tuelIdx].abzug;
@@ -718,6 +937,8 @@ function checkBWare(breite, hoehe, farbe) {
             });
         });
     });
+
+    console.log('[checkBWare] matches:', matches.length, 'skipped:', skipped);
 
     const matchHtml = matches.length ? `<div style="font-weight:700;margin-bottom:6px"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 7.97l3.418-3.421"/><path d="M17 3.414 13.582 7 17 10.586"/><path d="m9.5 4.39 3.918-1.247 1.247 3.918"/></svg></span> Passende B-Ware gefunden!</div>` +
         matches.map(m => `<div onclick="openOrderDetail('${m.orderId}')" style="padding:10px;background:white;border-radius:8px;margin-top:6px;cursor:pointer;border:1px solid var(--amber-border);transition:background 0.15s" ontouchstart="this.style.background='var(--amber-bg)'" ontouchend="this.style.background='white'">

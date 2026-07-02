@@ -36,11 +36,15 @@ function openOrderDetail(id) {
     const total=o.totalPrice||0, rest=total-(o.anzahlung||0);
     editMeasures = (o.measures||[]).map(m=>({
         breite:m.breite, hoehe:m.hoehe, stueck:m.stueck||1,
-        farbe:m.farbe||o.farbe||'Antrazit',
-        preis:m.sqmPrice||sqmPrice, doppeltuer:!!m.doppeltuer,
+        farbe:m.farbe||(o.measures?.[0]?.farbe)||'Antrazit',
+        preis: Number.isFinite(m.sqmPrice) ? m.sqmPrice : sqmPrice, doppeltuer:!!m.doppeltuer,
         // v1.18.14: Alle Felder bewahren damit beim Speichern nichts verloren geht
         variants: m.variants ? Object.assign({}, m.variants) : {},
         modelId: m.modelId || '',
+        // v1.19.59: gespeicherte Anzeige-Namen bewahren (für Übersicht auch nach Hard-Delete)
+        modelName: m.modelName || '',
+        netzFarbeName: m.netzFarbeName || '',
+        plisseeFarbeName: m.plisseeFarbeName || '',
         bemerkung: m.bemerkung || '',
         materialColors: m.materialColors ? Object.assign({}, m.materialColors) : {}
     }));
@@ -57,7 +61,14 @@ function openOrderDetail(id) {
         const templateMsg = (settingsText && settingsText.value) ? settingsText.value : defaultMsg;
         const totalPaid = (o.payments||[]).reduce((s,p) => s + (p.amount||0), 0);
         const restBetrag = Math.max(0, (o.totalPrice||0) - totalPaid).toFixed(2);
-        const waMsg = encodeURIComponent(templateMsg.replace(/{name}/g, kundenName.trim()).replace(/{rest}/g, restBetrag));
+        // v1.19.53: {bestellnummer} Placeholder + WhatsApp-Bold (*…*)
+        const bestellnrBold = o.orderNumber ? `*${o.orderNumber}*` : '';
+        const waMsg = encodeURIComponent(
+            templateMsg
+                .replace(/{name}/g, kundenName.trim())
+                .replace(/{rest}/g, restBetrag)
+                .replace(/{bestellnummer}/g, bestellnrBold)
+        );
         const waLink = phone ? 'https://wa.me/' + phone.replace(/^\+/,'').replace(/^0043/,'43').replace(/^0/,'43') + '?text=' + waMsg : '';
         const telLink = phone ? 'tel:' + phone : '';
 
@@ -87,8 +98,7 @@ function openOrderDetail(id) {
         </div>`;
     }
 
-    // Color select
-    const colorOpts = ['Antrazit','Weiß','Braun'].map(c=>`<option value="${c}"${o.farbe===c?' selected':''}>${c}</option>`).join('');
+    // v1.19.50: Top-Level o.farbe abgeschafft — Farben pro Maß sind die Quelle der Wahrheit.
 
     // v1.18.22: Status-Dropdown — Spalten der App in fester Reihenfolge
     // v1.18.23: Nach Berechtigungen filtern. Reparatur ist KEIN Dropdown-Eintrag
@@ -99,6 +109,7 @@ function openOrderDetail(id) {
         'Bestellung':    {bg:'#ede9fe', color:'#6d28d9', border:'#c4b5fd'},
         'Warteliste':    {bg:'#fef3c7', color:'#92400e', border:'#fcd34d'},
         'In Produktion': {bg:'#fef3c7', color:'#b45309', border:'#fbbf24'},
+        'Transport':     {bg:'#cffafe', color:'#0e7490', border:'#67e8f9'},
         'Reparatur':     {bg:'#dbeafe', color:'#1e40af', border:'#93c5fd'},
         'Abholbereit':   {bg:'#d1fae5', color:'#047857', border:'#6ee7b7'},
         'Abgeholt':      {bg:'#e5e7eb', color:'#374151', border:'#9ca3af'},
@@ -112,6 +123,7 @@ function openOrderDetail(id) {
         'Bestellung':    null,
         'Warteliste':    'move_to_warteliste',
         'In Produktion': 'move_to_produktion',
+        'Transport':     'move_to_transport',
         'Abholbereit':   'move_to_abholbereit',
         'Abgeholt':      'move_to_abgeholt',
         'B-Ware':        'bware_move',
@@ -132,9 +144,15 @@ function openOrderDetail(id) {
         ? `<select id="orderStatusSelect_${id}" onchange="onOrderStatusChange('${id}', this)" style="width:100%;padding:11px 14px;background:${sc.bg};color:${sc.color};border:2px solid ${sc.border};border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2218%22 height=%2218%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22${encodeURIComponent(sc.color)}%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;padding-right:38px">${allowedStatus.map(col => '<option value="'+col+'"'+(col===currentCol?' selected':'')+'>Status: '+col+'</option>').join('')}</select>`
         : '';
 
+    // Aktuelle Position in der Warteschlange — nur wenn die Order in der
+     // „Bestellung"-Spalte sitzt und bezahlt ist (sonst gibt's keine Reihenfolge).
+    const queuePos = (typeof computeQueuePosition === 'function') ? computeQueuePosition(o) : null;
+    const queuePosBadge = queuePos
+        ? `<span title="Position in der Warteschlange" style="display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 9px;background:var(--primary);color:white;font-size:13px;font-weight:800;border-radius:13px;margin-right:8px;vertical-align:middle">${queuePos}</span>`
+        : '';
     document.getElementById('modalStickyHeader').innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div class="modal-title" style="margin-bottom:0">${o.orderNumber ? '<span style="color:var(--text-muted);font-weight:600;margin-right:6px">'+o.orderNumber+'</span>' : ''}Bestellung</div>
+            <div class="modal-title" style="margin-bottom:0">${queuePosBadge}${o.orderNumber ? '<span style="color:var(--text-muted);font-weight:600;margin-right:6px">'+o.orderNumber+'</span>' : ''}Bestellung</div>
             <button onclick="closeModal()" style="background:var(--border-light);color:var(--text-secondary);border:none;border-radius:10px;width:36px;height:36px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
@@ -158,13 +176,13 @@ function openOrderDetail(id) {
                 <div style="font-size:12px;color:#166534;margin-top:2px">Über Webshop eingegangen. Kunde wurde per Email benachrichtigt.</div>
             </div>
         </div>` : ''}
-        <div style="color:var(--text-muted);font-size:12px;margin-bottom:12px">${o.orderNumber ? '<span style="font-weight:700;color:var(--primary)">'+o.orderNumber+'</span> · ' : ''}${o.bestelldatum?'Bestellt: '+o.bestelldatum.split('-').reverse().join('.'):'Erstellt: '+formatDate(o.createdAt)}${o.frist?' · Frist: '+o.frist.split('-').reverse().join('.'):''}</div>
+        <div style="color:var(--text-muted);font-size:12px;margin-bottom:12px">${queuePos ? '<span style="display:inline-block;background:var(--primary);color:white;font-weight:800;padding:1px 8px;border-radius:10px;font-size:11px;margin-right:6px">'+queuePos+'. Platz</span>' : ''}${o.orderNumber ? '<span style="font-weight:700;color:var(--primary)">'+o.orderNumber+'</span> · ' : ''}${o.bestelldatum?'Bestellt: '+o.bestelldatum.split('-').reverse().join('.'):'Erstellt: '+formatDate(o.createdAt)}${o.frist?' · Frist: '+o.frist.split('-').reverse().join('.'):''}</div>
 
         <div class="card">
             <div class="card-label">Kundendaten</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div class="edit-field"><label>Vorname</label><input type="text" id="editVorname" value="${escHtml(o.vorname||'')}"></div>
-                <div class="edit-field"><label>Nachname</label><input type="text" id="editNachname" value="${escHtml(o.nachname||'')}"></div>
+                <div class="edit-field"><label>Vorname</label><input type="text" id="editVorname" value="${escHtml(o.vorname||'')}" oninput="sanitizeNameInput(this)" autocomplete="given-name"></div>
+                <div class="edit-field"><label>Nachname</label><input type="text" id="editNachname" value="${escHtml(o.nachname||'')}" oninput="sanitizeNameInput(this)" autocomplete="family-name"></div>
             </div>
             <div class="edit-field"><label>Telefon</label>
                 <div class="tel-row">
@@ -187,7 +205,6 @@ function openOrderDetail(id) {
                     <input type="tel" id="editTelNummer" class="tel-nummer" value="">
                 </div>
             </div>
-            <div class="edit-field"><label>Farbe</label><select id="editFarbe">${colorOpts}</select></div>
         </div>
 
         <div class="card">
@@ -196,7 +213,7 @@ function openOrderDetail(id) {
             <button class="edit-add-measure" onclick="addEditMeasure('${id}')">＋ Maß hinzufügen</button>
         </div>
 
-        <div class="card">
+        <div class="card price-protected">
             <div class="card-label">Preisübersicht</div>
             <div id="editPriceLines"></div>
             <div id="editPriceSummary"></div>
@@ -251,7 +268,7 @@ function renderEditMeasures(orderId) {
     // v1.18.14: Lock-Logik — Modell und Varianten sind gesperrt wenn Bestellung
     // schon "In Produktion" oder weiter (außer bei Reparatur)
     const o = orders.find(x => x.id === orderId);
-    const lockedColumns = ['In Produktion', 'Abholbereit', 'Abgeholt', 'Archiviert'];
+    const lockedColumns = ['In Produktion', 'Transport', 'Abholbereit', 'Abgeholt', 'Archiviert'];
     const isLocked = o && lockedColumns.includes(o.column) && !o.isReparatur;
     const lockHint = isLocked
         ? `<div style="margin-bottom:8px;padding:8px 10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font-size:11px;color:#78350f">⚠ Bestellung ist in "${o.column}" — Modell und Varianten können nur nach Verschieben zurück nach "Bestellung" geändert werden.</div>`
@@ -286,32 +303,56 @@ function renderEditMeasures(orderId) {
         const modelVariantIds = (currentModel && currentModel.variantIds) || [];
         modelVariantIds.forEach(vid => {
             const variant = getVariant(vid);
-            if (!variant || variant.active === false) return;
-            const opts = (variant.options || []).filter(opt => opt && !(opt.nurDoppeltuer && !m.doppeltuer));
-            if (!opts.length) return;
+            if (!variant) return;
+            const savedOptForVid = m.variants && m.variants[vid];
+            // v1.19.58: Deaktivierte Variante nur ausblenden, wenn DIESE Bestellung sie nicht nutzt.
+            // So bleibt eine alte Bestellung mit z.B. deaktiviertem "Netz/Plissee" vollständig sichtbar.
+            if (variant.active === false && !savedOptForVid) return;
+            const activeOpts = (variant.options || []).filter(opt => opt && opt.active !== false && !(opt.nurDoppeltuer && !m.doppeltuer));
+            // v1.19.58: gespeicherten (evtl. inaktiven/gelöschten) Wert erhalten
+            const optList = withSavedItem(activeOpts, variant.options, savedOptForVid, 'id');
+            if (!optList.length) return;
 
-            const currentOpt = m.variants && m.variants[vid];
+            const currentOpt = savedOptForVid;
             const optMissing = !currentOpt;
             const optBorder = optMissing
                 ? 'border:2px solid var(--amber);background:#fffbeb'
                 : 'border:1px solid var(--border);background:var(--card)';
             const placeholder = `<option value=""${!currentOpt?' selected':''} disabled>— bitte wählen —</option>`;
-            const dropdownOpts = placeholder + opts.map(opt => `<option value="${esc(opt.id)}"${currentOpt===opt.id?' selected':''}>${escHtml(opt.label)}</option>`).join('');
+            const dropdownOpts = placeholder + optList.map(opt => `<option value="${esc(opt.id)}"${currentOpt===opt.id?' selected':''}>${escHtml(opt.label || opt.name || opt.id)}${inactiveSuffix(opt)}</option>`).join('');
             variantsHtml += `<div class="field"><label>${escHtml(variant.name)}</label>
                 <select onchange="updateEditMeasureVariant(${i},'${esc(vid)}',this.value,'${orderId}')" ${isLocked?'disabled':''} style="font-size:13px;padding:9px 8px;width:100%;${optBorder};border-radius:8px;font-family:inherit;${isLocked?'opacity:0.5':''}">${dropdownOpts}</select></div>`;
 
+            // Followup-Flags aus der ECHTEN Option lesen (auch wenn gefiltert/inaktiv)
+            const currentOptObj = (variant.options || []).find(opt => opt.id === currentOpt);
+            // v1.19.28: Netz-Folgeauswahl analog Plissee
+            if (currentOptObj && currentOptObj.netzFollowup) {
+                const activeNetzColors = (cachedNetzColors || []).filter(c => c.active !== false);
+                const currentNC = m.variants && m.variants.netzFarbe;
+                const netzList = withSavedItem(activeNetzColors, cachedNetzColors, currentNC, 'id', m.netzFarbeName);
+                if (netzList.length || currentNC) {
+                    const ncMissing = !currentNC;
+                    const ncBorder = ncMissing
+                        ? 'border:2px solid var(--amber);background:#fffbeb'
+                        : 'border:1px solid var(--border);background:var(--card)';
+                    const netzPlaceholder = `<option value=""${!currentNC?' selected':''} disabled>— bitte wählen —</option>`;
+                    const netzOpts = netzPlaceholder + netzList.map(c => `<option value="${esc(c.id)}"${currentNC===c.id?' selected':''}>${escHtml(c.name)}${inactiveSuffix(c)}</option>`).join('');
+                    variantsHtml += `<div class="field"><label>Netz-Farbe</label>
+                        <select onchange="updateEditMeasureVariant(${i},'netzFarbe',this.value,'${orderId}')" ${isLocked?'disabled':''} style="font-size:13px;padding:9px 8px;width:100%;${ncBorder};border-radius:8px;font-family:inherit;${isLocked?'opacity:0.5':''}">${netzOpts}</select></div>`;
+                }
+            }
             // Plissee-Folgeauswahl
-            const currentOptObj = opts.find(opt => opt.id === currentOpt);
             if (currentOptObj && currentOptObj.plisseeFollowup) {
                 const activePlisseeColors = (cachedPlisseeColors || []).filter(c => c.active !== false);
-                if (activePlisseeColors.length) {
-                    const currentPC = m.variants && m.variants.plisseeFarbe;
+                const currentPC = m.variants && m.variants.plisseeFarbe;
+                const plisseeList = withSavedItem(activePlisseeColors, cachedPlisseeColors, currentPC, 'id', m.plisseeFarbeName);
+                if (plisseeList.length || currentPC) {
                     const pcMissing = !currentPC;
                     const pcBorder = pcMissing
                         ? 'border:2px solid var(--amber);background:#fffbeb'
                         : 'border:1px solid var(--border);background:var(--card)';
                     const plisseePlaceholder = `<option value=""${!currentPC?' selected':''} disabled>— bitte wählen —</option>`;
-                    const plisseeOpts = plisseePlaceholder + activePlisseeColors.map(c => `<option value="${esc(c.id)}"${currentPC===c.id?' selected':''}>${escHtml(c.name)}</option>`).join('');
+                    const plisseeOpts = plisseePlaceholder + plisseeList.map(c => `<option value="${esc(c.id)}"${currentPC===c.id?' selected':''}>${escHtml(c.name)}${inactiveSuffix(c)}</option>`).join('');
                     variantsHtml += `<div class="field"><label>Plissee-Farbe</label>
                         <select onchange="updateEditMeasureVariant(${i},'plisseeFarbe',this.value,'${orderId}')" ${isLocked?'disabled':''} style="font-size:13px;padding:9px 8px;width:100%;${pcBorder};border-radius:8px;font-family:inherit;${isLocked?'opacity:0.5':''}">${plisseeOpts}</select></div>`;
                 }
@@ -320,8 +361,8 @@ function renderEditMeasures(orderId) {
 
         const hasBP = m.variants && (m.variants.schwellenlos === 'ja' || m.variants.bodenprofil === 'ja');
 
-        return `<div class="edit-measure-row" style="display:block;border:1px solid var(--border-light);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg-light)">
-            ${editMeasures.length>1?`<button onclick="editMeasures.splice(${i},1);renderEditMeasures('${orderId}');calcEditPrice('${orderId}')" style="position:absolute;right:8px;top:8px;background:var(--red);color:white;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-family:inherit">×</button>`:''}
+        return `<div class="edit-measure-row" style="position:relative;display:block;border:1px solid var(--border-light);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg-light)">
+            ${editMeasures.length>1?`<button onclick="editMeasures.splice(${i},1);renderEditMeasures('${orderId}');calcEditPrice('${orderId}')" style="position:absolute;right:-10px;top:-10px;background:var(--red);color:white;border:2px solid white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;line-height:1;z-index:10;box-shadow:0 2px 6px rgba(0,0,0,0.2)" title="Dieses Maß komplett entfernen">×</button>`:''}
 
             <!-- v1.18.17 Phase 6: Maße + Skizze responsiv (Handy=untereinander, Desktop=nebeneinander) -->
             <div class="masse-layout">
@@ -333,15 +374,26 @@ function renderEditMeasures(orderId) {
                         <div class="field" style="width:55px;flex-shrink:0"><label>Stk</label><input type="number" value="${m.stueck}" min="1" oninput="editMeasures[${i}].stueck=parseInt(this.value)||1;calcEditPrice('${orderId}')"></div>
                     </div>
                     <!-- Farbe + €/m² -->
+                    <!-- v1.19.36: dynamische Farbliste aus Stammdaten (vorher hardcodiert auf 3 Farben). -->
                     <div style="display:flex;gap:8px;align-items:flex-end">
                         <div class="field" style="flex:1"><label>Farbe</label>
                             <select onchange="editMeasures[${i}].farbe=this.value;calcEditPrice('${orderId}')" style="font-size:13px;padding:9px 8px;width:100%">
-                                <option value="Antrazit"${m.farbe==='Antrazit'?' selected':''}>Antrazit</option>
-                                <option value="Weiß"${m.farbe==='Weiß'?' selected':''}>Weiß</option>
-                                <option value="Braun"${m.farbe==='Braun'?' selected':''}>Braun</option>
+                                ${(() => {
+                                    // v1.19.49: Modell-Restriktion bleibt; Fallback nutzt zentralen Helper.
+                                    // v1.19.58: deaktivierte Farben mit "(inaktiv)" markieren (Konsistenz mit getColorOptionsHtml)
+                                    if (currentModel && Array.isArray(currentModel.colors) && currentModel.colors.length) {
+                                        const activeColorNames = (cachedColors||[]).filter(c => c && c.active !== false).map(c => c.name);
+                                        // v1.19.62: nur AKTIVE Modell-Farben anbieten; die gespeicherte (evtl. inaktive)
+                                        // Farbe trotzdem behalten und als "(inaktiv)" markieren — geht nie verloren.
+                                        let names = currentModel.colors.map(cid => (typeof getColor==='function' ? getColor(cid)?.name : null)).filter(Boolean).filter(n => activeColorNames.includes(n));
+                                        if (m.farbe && !names.includes(m.farbe)) names = [m.farbe, ...names];
+                                        return names.map(n => `<option value="${escHtml(n)}"${m.farbe===n?' selected':''}>${escHtml(n)}${!activeColorNames.includes(n) ? ' (inaktiv)' : ''}</option>`).join('');
+                                    }
+                                    return getColorOptionsHtml(m.farbe);
+                                })()}
                             </select>
                         </div>
-                        <div class="field" style="width:75px;flex-shrink:0"><label>€/m²</label><input type="number" value="${m.preis||sqmPrice}" step="0.5" oninput="editMeasures[${i}].preis=parseFloat(this.value)||0;calcEditPrice('${orderId}')"></div>
+                        <div class="field price-protected" style="width:75px;flex-shrink:0"><label>€/m²</label><input type="number" value="${Number.isFinite(m.preis) ? m.preis : sqmPrice}" step="0.5" oninput="editMeasures[${i}].preis=parseFloat(this.value)||0;calcEditPrice('${orderId}')"></div>
                     </div>
                     <!-- Modell -->
                     ${modelDropdown}
@@ -355,7 +407,7 @@ function renderEditMeasures(orderId) {
 
             <!-- Bemerkung -->
             <div class="field" style="margin-top:8px"><label>Bemerkung (Maß)</label>
-                <input type="text" value="${escHtml(m.bemerkung||'')}" oninput="editMeasures[${i}].bemerkung=this.value" placeholder="z.B. links anschlagend" style="font-size:13px;padding:9px 8px;width:100%">
+                <input type="text" value="${escHtml(m.bemerkung||'')}" oninput="editMeasures[${i}].bemerkung=this.value" placeholder="" style="font-size:13px;padding:9px 8px;width:100%">
             </div>
         </div>`;
     }).join('');
@@ -457,51 +509,128 @@ async function updateEditMeasureModel(i, newModelId, orderId) {
     renderEditMeasures(orderId);
 }
 
+// v1.19.47d: Live-Handler für m²-Preis-Eingabe — aktualisiert Modell + sichtbare
+// Beträge ohne Re-Render der Inputs. Verhindert dass Mobile-Tastatur zwischen
+// Tastenanschlägen den Fokus verliert.
+function onSqmPriceInput(i, rawValue, orderId) {
+    const v = parseFloat(String(rawValue).replace(',', '.')) || 0;
+    if (!editMeasures[i]) return;
+    editMeasures[i].preis = v;
+    // Diese Zeile-Betrag updaten (In-Place, ohne Re-Render)
+    const linesEl = document.getElementById('editPriceLines');
+    const lineRow = linesEl && linesEl.querySelector(`.price-line[data-line="${i}"]`);
+    if (lineRow) {
+        const m = editMeasures[i];
+        const b = parseFloat(m.breite)||0, h = parseFloat(m.hoehe)||0, s = m.stueck||1;
+        const rawSqm = (b/100)*(h/100)*s;
+        const billableSqm = Math.max(rawSqm, 1*s);
+        const lineTotal = billableSqm * v;
+        const amountEl = lineRow.querySelector('.price-line-amount');
+        if (amountEl) amountEl.textContent = '€ ' + lineTotal.toFixed(2);
+    }
+    // Gesamtsumme + Offen-Status neu rechnen (rendert die Summary, NICHT die Inputs)
+    calcEditPrice(orderId);
+}
+
 function calcEditPrice(orderId) {
     let total=0;
     const linesEl=document.getElementById('editPriceLines');
     const summaryEl=document.getElementById('editPriceSummary');
     const paySection=document.getElementById('editPaymentSection');
     if(!linesEl||!summaryEl) return;
+
+    // v1.19.16: Reparatur-Bestellungen haben einen pauschalen Reparatur-Preis
+    // (kein m²-basierter Preis pro Maß). Wir zeigen ein einzelnes editierbares
+    // Preis-Feld und überspringen die per-Maß-Rechnung. 0 € ist ebenfalls erlaubt.
+    const orderObj = orders.find(x => x.id === orderId);
+    if (orderObj && orderObj.isReparatur) {
+        const repPrice = parseFloat(orderObj.totalPrice) || 0;
+        linesEl.innerHTML = `<div style="padding:10px 0;font-size:13px;color:var(--text-secondary)">
+            <strong style="color:#1e40af">🔧 Reparatur-Pauschalpreis</strong>
+            <div style="margin-top:4px;font-size:11px;color:var(--text-muted)">Maße werden nicht mit m²-Preis neu berechnet. 0 € erlaubt.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--border-light)">
+            <label style="font-size:13px;font-weight:600;flex:1">Reparatur-Preis (€)</label>
+            <input type="number" id="editReparaturPrice" inputmode="decimal" step="0.01" min="0" value="${repPrice.toFixed(2)}"
+                   style="width:120px;padding:8px 10px;font-size:15px;font-weight:700;text-align:right;border:2px solid var(--primary-light);border-radius:8px;font-family:inherit;color:var(--primary);background:var(--primary-bg)"
+                   oninput="onReparaturPriceChange('${orderId}', parseFloat(this.value))">
+        </div>`;
+        total = repPrice;
+        // Standard-Summary unten weiter rendern damit Zahlungen + Offen sichtbar bleiben
+        const payments = orderObj.payments || [];
+        const totalPaid = payments.reduce((s,p)=>s+(p.amount||0), 0);
+        const offen = total - totalPaid;
+        let html = '';
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 8px;border-top:2px solid var(--border)">
+            <span style="font-size:16px;font-weight:700">Gesamt</span>
+            <span style="font-size:20px;font-weight:700">€ ${total.toFixed(2)}</span>
+        </div>`;
+        if (payments.length) {
+            html += `<div style="margin-bottom:8px">`;
+            payments.forEach(p => {
+                const ds = p.date ? formatPayDate(p.date) : '';
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-light)">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:14px">💰</span>
+                        <div>
+                            <div style="font-size:13px;font-weight:600">${escHtml(p.label||'Zahlung')}</div>
+                            <div style="font-size:11px;color:var(--text-muted)">${ds}</div>
+                        </div>
+                    </div>
+                    <span style="font-size:14px;font-weight:700;color:var(--green)">- € ${(p.amount||0).toFixed(2)}</span>
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:10px;background:${offen<=0?'var(--green-bg)':'var(--red-bg)'}">
+            <span style="font-size:15px;font-weight:700;color:${offen<=0?'var(--green)':'var(--red)'}">${offen<=0?'Vollständig bezahlt':'Offener Betrag'}</span>
+            <span style="font-size:18px;font-weight:700;color:${offen<=0?'var(--green)':'var(--red)'}">€ ${offen.toFixed(2)}</span>
+        </div>`;
+        summaryEl.innerHTML = html;
+        if (paySection) {
+            if (offen > 0.01) {
+                paySection.innerHTML = `<div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+                    <input type="number" id="addPaymentAmount" placeholder="Betrag €" step="0.01" style="flex:1;padding:11px 14px;border:2px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;text-align:center">
+                    <button class="action-btn primary" onclick="addPayment('${orderId}')">+ Zahlung</button>
+                </div>`;
+            } else {
+                paySection.innerHTML = '';
+            }
+        }
+        return;
+    }
+
     let linesHtml='';
     editMeasures.forEach((m,i) => {
-        const b=parseFloat(m.breite)||0, h=parseFloat(m.hoehe)||0, s=m.stueck||1, p=m.preis||sqmPrice;
+        const b=parseFloat(m.breite)||0, h=parseFloat(m.hoehe)||0, s=m.stueck||1;
+        const p = Number.isFinite(m.preis) ? m.preis : sqmPrice; // 0 € explizit erlaubt
         const rawSqm=(b/100)*(h/100)*s;
         const billableSqm=Math.max(rawSqm, 1*s);
         const lineTotal=billableSqm*p;
         total+=lineTotal;
         if(b&&h) {
             const minHint = rawSqm < 1*s ? ' <span style="color:var(--amber);font-size:11px;font-weight:600">(Mind. '+s+' m²)</span>' : '';
-            // Variant-Hinweise (v1.16.8-p1, p3, v1.17.3)
-            const variantHints = [];
-            const mv = m.variants || {};
-            Object.keys(mv).forEach(vid => {
-                if (vid === 'tuerart') return;
-                if (vid === 'plisseeFarbe') return;
-                const variant = (typeof getVariant === 'function') ? getVariant(vid) : null;
-                if (!variant) return;
-                const opt = (variant.options || []).find(o => o.id === mv[vid]);
-                if (!opt) return;
-                if (variant.defaultOption && variant.defaultOption === opt.id) return;
-                let label = opt.label;
-                const isYesLike = /^(ja|yes)$/i.test(opt.label || '');
-                if (isYesLike) label = variant.name;
-                if (opt.plisseeFollowup && mv.plisseeFarbe) {
-                    const pc = (typeof getPlisseeColor === 'function') ? getPlisseeColor(mv.plisseeFarbe) : null;
-                    if (pc) label = (isYesLike ? variant.name : opt.label) + ' - ' + pc.name;
-                }
-                variantHints.push(label);
-            });
-            const variantStr = variantHints.length ? ' <span style="color:var(--primary);font-size:11px;font-weight:700;background:var(--primary-bg);padding:1px 6px;border-radius:6px;margin-left:4px">' + variantHints.map(escHtml).join(', ') + '</span>' : '';
-            linesHtml+=`<div class="price-line"><div class="price-line-desc">${b}×${h} cm ${m.farbe||'Antrazit'} ${s} Stück${variantStr}${minHint}</div><div class="price-line-calc"><span class="price-line-sqm">${billableSqm.toFixed(2)} m² × <input class="price-sqm-input" type="number" value="${p}" step="0.5" oninput="editMeasures[${i}].preis=parseFloat(this.value)||0;calcEditPrice('${orderId}')"> €/m²</span><span class="price-line-amount">€ ${lineTotal.toFixed(2)}</span></div></div>`;
+            // v1.19.59: einheitliche, vollständige Übersicht über zentralen Helper
+            // (zeigt Modell, Profilfarbe, Türart, Netz/Plissee UND beide Folgefarben — Kombi-Bug behoben)
+            const summaryStr = buildMeasureSummaryHtml(m);
+            // v1.19.47d: data-line + data-amount für gezielte In-Place Updates ohne
+            // Re-Render der Inputs. Handler onSqmPriceInput aktualisiert Modell + Beträge.
+            linesHtml+=`<div class="price-line" data-line="${i}"><div class="price-line-desc">${summaryStr}${minHint}</div><div class="price-line-calc"><span class="price-line-sqm">${billableSqm.toFixed(2)} m² × <input class="price-sqm-input" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" data-priceidx="${i}" value="${p}" oninput="onSqmPriceInput(${i},this.value,'${orderId}')"> €/m²</span><span class="price-line-amount" data-amount="${i}">€ ${lineTotal.toFixed(2)}</span></div></div>`;
         }
     });
-    linesEl.innerHTML=linesHtml||'<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Keine Artikel</div>';
+    // v1.19.47d: NUR neu rendern wenn Struktur sich ändert (Maße hinzu/weg) — sonst
+    // bleibt das aktive Input erhalten und Mobile-Tastatur verliert nicht den Fokus.
+    const _activeIsPriceInput = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('price-sqm-input');
+    const _existingLineCount = linesEl.querySelectorAll('.price-line').length;
+    const _wantedLineCount = editMeasures.filter(m => parseFloat(m.breite)>0 && parseFloat(m.hoehe)>0).length;
+    if (!_activeIsPriceInput || _existingLineCount !== _wantedLineCount) {
+        linesEl.innerHTML = linesHtml || '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Keine Artikel</div>';
+    }
 
     const o=orders.find(x=>x.id===orderId);
-    // If saved totalPrice differs from calculated (admin manual override), use saved
-    const savedTotal = o ? (o.totalPrice||0) : 0;
-    if (savedTotal && Math.abs(savedTotal - total) > 0.02) total = savedTotal;
+    // If saved totalPrice differs from calculated (admin manual override), use saved.
+    // v1.19.17: auch 0 € als gültigen Override respektieren (Muster, Kulanz).
+    if (o && Number.isFinite(o.totalPrice) && Math.abs(o.totalPrice - total) > 0.02) total = o.totalPrice;
     const payments=o?(o.payments||[]):[];
     const totalPaid=payments.reduce((s,p)=>s+(p.amount||0),0);
     const offen=total-totalPaid;
@@ -618,7 +747,7 @@ async function doSaveOrderEdit(id) {
     const editVw = document.getElementById('editVorwahl').value;
     const editNr = document.getElementById('editTelNummer').value||'';
     const telefon = normalizePhone(editVw, editNr);
-    const farbe = document.getElementById('editFarbe').value;
+    // v1.19.50: Top-Level farbe entfernt — pro Maß ist die Quelle der Wahrheit.
     const frist = document.getElementById('editFrist').value;
     const bestelldatum = document.getElementById('editBestelldatum').value;
     const bemerkung = document.getElementById('editBemerkung').value.trim();
@@ -644,7 +773,6 @@ async function doSaveOrderEdit(id) {
     // Kundendaten
     if(o.vorname!==vorname||o.nachname!==nachname) changes.push(`Name: "${o.vorname||''} ${o.nachname||''}" → "${vorname} ${nachname}"`);
     if(o.telefon!==telefon) changes.push(`Telefon: ${o.telefon||'(leer)'} → ${telefon}`);
-    if(o.farbe!==farbe) changes.push(`Hauptfarbe: ${o.farbe||'(leer)'} → ${farbe}`);
     if((o.frist||'')!==(frist||'')) changes.push(`Frist: ${o.frist||'(leer)'} → ${frist||'(leer)'}`);
     if((o.bestelldatum||'')!==(bestelldatum||'')) changes.push(`Bestelldatum: ${o.bestelldatum||'(leer)'} → ${bestelldatum||'(leer)'}`);
     if((o.bemerkung||'')!==(bemerkung||'')) changes.push(`Bemerkung geändert`);
@@ -718,7 +846,7 @@ async function doSaveOrderEdit(id) {
 
     let totalSqm=0, totalPrice=0;
     const measures = validMeasures.map(m=>{
-        const b=parseFloat(m.breite),h=parseFloat(m.hoehe),s=m.stueck||1,p=m.preis||sqmPrice;
+        const b=parseFloat(m.breite),h=parseFloat(m.hoehe),s=m.stueck||1,p=(Number.isFinite(m.preis) ? m.preis : sqmPrice);
         const sq=(b/100)*(h/100)*s; const billSq=Math.max(sq, 1*s); totalSqm+=sq; totalPrice+=billSq*p;
         // v1.18.14: variants und modelId IMMER speichern wenn vorhanden — auch wenn modelId leer ist.
         // Vorher: if (m.modelId) {...} hat variants verloren wenn modelId fehlte (Bug bei alten Bestellungen).
@@ -734,6 +862,7 @@ async function doSaveOrderEdit(id) {
         }
         if (m.bemerkung) measureObj.bemerkung = m.bemerkung;
         if (m.materialColors) measureObj.materialColors = m.materialColors;
+        attachMeasureNames(measureObj); // v1.19.59: Namen mitspeichern
         return measureObj;
     });
 
@@ -742,10 +871,20 @@ async function doSaveOrderEdit(id) {
         totalPrice = totalOverrideValue;
         changes.push('Preis manuell auf € ' + totalPrice.toFixed(2) + ' geändert');
     }
+    // v1.19.16: Bei Reparatur ist der Pauschal-Preis IMMER der Wert aus dem Reparatur-Feld
+    // (auch 0 €). Berechtigung: jeder mit price_edit (oder Admin) darf den Reparatur-Preis ändern.
+    if (o.isReparatur && totalOverrideValue !== null) {
+        totalPrice = totalOverrideValue;
+        // Pro Maß sqmPrice auf 0 setzen damit keine zukünftige m²-Rechnung erfolgt
+        measures.forEach(mm => { mm.sqmPrice = 0; });
+        if (Math.abs((o.totalPrice || 0) - totalPrice) > 0.01) {
+            changes.push('Reparatur-Preis: € ' + (o.totalPrice || 0).toFixed(2) + ' → € ' + totalPrice.toFixed(2));
+        }
+    }
     totalOverrideValue = null;
 
     const updateData = {
-        vorname, nachname, telefon, farbe,
+        vorname, nachname, telefon,
         measures,
         totalSqm: parseFloat(totalSqm.toFixed(4)),
         totalPrice: parseFloat(totalPrice.toFixed(2)),
@@ -1010,7 +1149,10 @@ function openDraftDetail(draftId) {
         document.getElementById('newBemerkung').value = d.bemerkung || '';
         document.getElementById('newAnzahlung').value = d.anzahlung || 0;
         document.getElementById('newBestelldatum').value = d.bestelldatum || new Date().toISOString().split('T')[0];
-        if (d.frist) document.getElementById('newFrist').value = d.frist;
+        if (d.frist) {
+            document.getElementById('newFrist').value = d.frist;
+            document.getElementById('newFrist').dataset.touched = '1';
+        }
 
         // Maße in measureFields übernehmen (mit Varianten v1.15.1)
         measureFields = (d.measures || []).map(m => ({
@@ -1024,6 +1166,13 @@ function openDraftDetail(draftId) {
         }
         renderNewForm();
         updateNewFormHeader();
+        // v1.20.1: Aktivitäten-Log des Entwurfs anzeigen
+        const logEl = document.getElementById('draftActivityLog');
+        if (logEl) {
+            logEl.innerHTML = (d.log || []).map(l =>
+                `<div class="activity-item"><span class="activity-time">${formatLogTime(l.time)}</span><span class="activity-text">${escHtml(l.text)}</span></div>`
+            ).join('') || '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Keine Aktivitäten</div>';
+        }
         showToast('Entwurf geladen — du kannst ihn bearbeiten.', 'success', 2500);
     }, 100);
 }
@@ -1051,6 +1200,9 @@ function updateNewFormHeader() {
     // Entwurfs-Aktionsleiste oben sichtbar machen falls vorhanden
     const draftActions = document.getElementById('draftActionsBar');
     if (draftActions) draftActions.style.display = editingDraftId ? '' : 'none';
+    // v1.20.1: Aktivitäten-Log-Karte nur im Entwurfs-Modus zeigen
+    const draftActivityCard = document.getElementById('draftActivityCard');
+    if (draftActivityCard) draftActivityCard.style.display = editingDraftId ? '' : 'none';
     // Untere Knöpfe verstecken im Entwurfs-Modus (sonst doppelte Anzeige)
     const bottomBar = document.getElementById('bottomActionsBar');
     if (bottomBar) bottomBar.style.display = editingDraftId ? 'none' : 'flex';
@@ -1071,7 +1223,12 @@ function resetNewForm() {
     setVal('newBemerkung', '');
     setVal('newAnzahlung', '');
     setVal('newFrist', '');
+    // Touched-Marker zurücksetzen, damit die nächste Bestellung wieder den
+    // Vorschlagswert aus prodstats reinbekommt.
+    const fristEl = document.getElementById('newFrist'); if (fristEl) delete fristEl.dataset.touched;
     setVal('newBestelldatum', new Date().toISOString().split('T')[0]);
+    // Modell-Auswahl ist Pflichtfeld — kein Vorauswahl, der Mitarbeiter muss aktiv wählen
+    // (analog Farbe/Türart/Bodenprofil mit „— bitte wählen —").
     measureFields = [{ breite: '', hoehe: '', stueck: 1, farbe: '', preis: sqmPrice, doppeltuer: false, modelId: '', variants: {} }];
     if (typeof renderNewForm === 'function') renderNewForm();
     if (typeof updateNewFormHeader === 'function') updateNewFormHeader();
@@ -1133,6 +1290,7 @@ async function saveAsDraft() {
             measureObj.bemerkung = '';
             measureObj.materialColors = {};
         }
+        attachMeasureNames(measureObj); // v1.19.59: Namen mitspeichern
         return measureObj;
     });
 
@@ -1145,7 +1303,6 @@ async function saveAsDraft() {
             // Update existing draft
             await db.collection('orders').doc(editingDraftId).update({
                 vorname, nachname, telefon,
-                farbe: measures[0].farbe,
                 measures,
                 totalSqm: parseFloat(totalSqm.toFixed(4)),
                 totalPrice: parseFloat(totalPrice.toFixed(2)),
@@ -1154,7 +1311,9 @@ async function saveAsDraft() {
                 bemerkung: bemerkung || null,
                 filialeId, filialeName,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedBy: currentUser ? currentUser.email : 'unknown'
+                updatedBy: currentUser ? currentUser.email : 'unknown',
+                // v1.20.1: Bearbeitung im Entwurfs-Log festhalten
+                log: firebase.firestore.FieldValue.arrayUnion({ time: firebase.firestore.Timestamp.now(), text: getUserName() + ' hat Entwurf bearbeitet' })
             });
             showToast('Entwurf aktualisiert.', 'success');
         } else {
@@ -1164,7 +1323,6 @@ async function saveAsDraft() {
                 isDraft: true,
                 draftNumber,
                 vorname, nachname, telefon,
-                farbe: measures[0].farbe,
                 measures,
                 totalSqm: parseFloat(totalSqm.toFixed(4)),
                 totalPrice: parseFloat(totalPrice.toFixed(2)),
@@ -1273,7 +1431,7 @@ function openReparaturForm(originalId) {
     // Maße der Original-Bestellung als Vorlage übernehmen
     window._reparaturMeasures = (orig.measures || []).map(m => ({
         breite: m.breite, hoehe: m.hoehe, stueck: m.stueck || 1,
-        farbe: m.farbe || orig.farbe || 'Antrazit',
+        farbe: m.farbe || (orig.measures?.[0]?.farbe) || 'Antrazit',
         doppeltuer: !!m.doppeltuer,
         sqmPrice: 0  // Reparatur hat eigenen Preis, sqmPrice nicht relevant
     }));
@@ -1346,10 +1504,9 @@ function openReparaturForm(originalId) {
 function renderReparaturMeasuresList() {
     const el = document.getElementById('repMeasuresList');
     if (!el) return;
-    const colors = (cachedColors || []).filter(c => c.active !== false).map(c => c.name);
-    const colorList = colors.length ? colors : ['Antrazit', 'Weiß', 'Braun'];
     el.innerHTML = window._reparaturMeasures.map((m, i) => {
-        const colorOpts = colorList.map(c => `<option value="${c}" ${m.farbe === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+        // v1.19.49: Farb-Quelle aus Stammdaten via zentralem Helper.
+        const colorOpts = getColorOptionsHtml(m.farbe);
         return `
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;padding:8px;border:1px solid var(--border-light);border-radius:8px;background:var(--card)">
                 <input type="number" inputmode="decimal" placeholder="Breite" value="${m.breite || ''}"
@@ -1422,6 +1579,7 @@ async function saveReparatur(originalId) {
             measureObj.bemerkung = '';
             measureObj.materialColors = orig0.materialColors || {};
         }
+        attachMeasureNames(measureObj); // v1.19.59: Namen mitspeichern
         return measureObj;
     });
 
@@ -1439,14 +1597,15 @@ async function saveReparatur(originalId) {
             vorname: orig.vorname || '',
             nachname: orig.nachname || '',
             telefon: orig.telefon || '',
-            farbe: measures[0].farbe || 'Antrazit',
-            // Reparatur-spezifisch
+            // v1.19.50: kein o.farbe mehr — measures[i].farbe ist Quelle der Wahrheit
             measures: newMeasures,
             totalSqm: parseFloat(totalSqm.toFixed(4)),
             totalPrice: repPrice,
             anzahlung: repAnzahlung,
             payments: repAnzahlung > 0 ? [{ amount: repAnzahlung, date: firebase.firestore.Timestamp.now(), label: 'Anzahlung Reparatur' }] : [],
-            paid: repAnzahlung >= repPrice && repPrice > 0,
+            // v1.19.16: 0 €-Reparatur direkt als bezahlt markieren (Kulanz). Sonst gilt:
+            // bezahlt sobald Anzahlung >= Preis.
+            paid: repPrice === 0 || (repAnzahlung >= repPrice),
             bestelldatum: bestelldatum || new Date().toISOString().split('T')[0],
             frist: frist || null,
             bemerkung: bemerkung || null,
@@ -1503,9 +1662,20 @@ function useOrderInRechner(id) {
     // Sync Doppeltür checkbox from first measure
     const dtCb = document.getElementById('rechnerDoppeltuer');
     if (dtCb) dtCb.checked = !!(m && m.doppeltuer);
-    const farbeName = m ? (m.farbe || o.farbe) : o.farbe;
-    const idx={Antrazit:0,'Weiß':1,Braun:2}[farbeName];
-    if(idx!==undefined){ document.querySelectorAll('#tab-rechner .color-btn').forEach((b,i)=>b.classList.toggle('active',i===idx)); const bg=['#4a4a4a','#e0e0e0','#8B4513'],cl=['#ccc','#444','#fac775']; farbe={name:farbeName,bg:bg[idx],color:cl[idx]}; selectedColor=farbeName; }
+    // v1.19.50: o.farbe abgeschafft + selectedColor IMMER aus Slide-Farbe (nicht nur bei Hardcode-3er).
+    const farbeName = (m && m.farbe) || (o.measures?.[0]?.farbe) || '';
+    if (farbeName) {
+        selectedColor = farbeName;
+        const cDef = (typeof cachedColors !== 'undefined' && Array.isArray(cachedColors))
+            ? cachedColors.find(c => c && c.name === farbeName) : null;
+        farbe = {
+            name: farbeName,
+            bg: cDef?.bg || (typeof getColorStyle === 'function' ? getColorStyle(farbeName).bg : '#534AB7'),
+            color: cDef?.text || (typeof getColorStyle === 'function' ? getColorStyle(farbeName).text : '#ffffff')
+        };
+        const legacyIdx = {Antrazit:0,'Weiß':1,Braun:2}[farbeName];
+        document.querySelectorAll('#tab-rechner .color-btn').forEach((b,i)=>b.classList.toggle('active',i===legacyIdx));
+    }
     // Show bemerkung in rechner
     const bemerkEl = document.getElementById('rechnerBemerkung');
     const bemerkText = document.getElementById('rechnerBemerkungText');
@@ -1528,6 +1698,22 @@ function useOrderInRechner(id) {
     // Quick-Input verstecken wenn Bestellung geladen (v1.15.0-p7)
     const quickInput = document.getElementById('rechnerQuickInput');
     if (quickInput) quickInput.style.display = 'none';
+
+    // v1.20.2: Bemerkungen als Popup zeigen (mit OK-Pflicht) — werden sonst übersehen.
+    // Sammelt Bestell-Bemerkung + Bemerkung pro Maß.
+    const noteParts = [];
+    if (o.bemerkung && String(o.bemerkung).trim()) {
+        noteParts.push(escHtml(String(o.bemerkung).trim()));
+    }
+    (o.measures || []).forEach((mm, i) => {
+        if (mm && mm.bemerkung && String(mm.bemerkung).trim()) {
+            noteParts.push(`<b>Maß ${i + 1}:</b> ${escHtml(String(mm.bemerkung).trim())}`);
+        }
+    });
+    if (noteParts.length) {
+        // kleine Verzögerung, damit der Tab-Wechsel/Render fertig ist
+        setTimeout(() => showAcknowledge('Bemerkung zur Bestellung', noteParts.join('<br><br>'), 'OK, gelesen'), 300);
+    }
 }
 
 async function addLog(id,text) { if(!id) return; await db.collection('orders').doc(id).update({log:firebase.firestore.FieldValue.arrayUnion({time:firebase.firestore.Timestamp.now(),text})}).catch(console.error); }
@@ -1538,36 +1724,50 @@ function renderNewForm() {
     const activeModels = (cachedModels || []).filter(mm => mm.active !== false);
     const showModelDropdown = activeModels.length > 0; // immer wenn mind. 1 Modell existiert (R2: Frage 1 = A)
 
-    // Default-Modell setzen falls leer
+    // Falls die aktuelle Auswahl in den aktiven Modellen nicht mehr existiert
+    // (Modell wurde inzwischen deaktiviert), setzen wir auf leer zurück — der
+    // Mitarbeiter muss dann aktiv wählen. Wir setzen aber KEINEN Default vor.
     const defModel = activeModels.find(mm => mm.default) || activeModels[0] || null;
-    measureFields.forEach(m => {
-        if (showModelDropdown && !m.modelId && defModel) m.modelId = defModel.id;
-    });
+    // v1.19.58: KEIN Auto-Clear mehr beim Render (Prinzip 3: Render verändert die
+    // Auswahl nie). Ein deaktiviertes/altes Modell bleibt erhalten und wird unten
+    // als "(inaktiv)"-Chip angezeigt.
 
     document.getElementById('newMeasures').innerHTML = measureFields.map((m,i) => {
-        // Aktuelles Modell für dieses Maß
-        const currentModel = m.modelId ? activeModels.find(mm => mm.id === m.modelId) : defModel;
+        // Aktuelles Modell für dieses Maß — Fallback auf vollen Lookup, damit auch
+        // ein deaktiviertes Modell seine Farben/Varianten korrekt liefert.
+        const currentModel = m.modelId ? (activeModels.find(mm => mm.id === m.modelId) || (typeof getModel==='function' ? getModel(m.modelId) : null)) : defModel;
 
         // Farb-Optionen — aus Modell oder global
         let allowedColorNames;
         if (currentModel && currentModel.colors && currentModel.colors.length) {
-            allowedColorNames = currentModel.colors.map(cid => {
-                const c = getColor(cid);
-                return c ? c.name : null;
-            }).filter(Boolean);
+            // v1.19.62: nur AKTIVE Modell-Farben — deaktivierte nicht für Neu-Auswahl anbieten
+            // (gespeicherte inaktive Farbe wird unten separat via savedColorExtra erhalten)
+            allowedColorNames = currentModel.colors.map(cid => getColor(cid)).filter(c => c && c.active !== false).map(c => c.name);
         } else {
-            const activeColors = (cachedColors || []).filter(c => c.active !== false);
-            allowedColorNames = activeColors.length ? activeColors.map(c => c.name) : ['Antrazit', 'Weiß', 'Braun'];
+            // v1.19.49: nur aktive Stammdaten-Farben — kein hardcoded 3er-Fallback mehr
+            allowedColorNames = (cachedColors || []).filter(c => c && c.active !== false).map(c => c.name);
         }
-        // v1.16.8-p3: Profilfarbe ist Pflichtfeld — keine Vorauswahl mehr
-        // Wenn aktuelle Farbe nicht erlaubt → leer setzen
+        // v1.16.8-p3: Profilfarbe ist Pflichtfeld — keine Vorauswahl.
+        // v1.19.58: KEIN Auto-Clear mehr (Prinzip 3). Eine gespeicherte, nicht mehr
+        // erlaubte Farbe (deaktiviert/gelöscht) bleibt erhalten und wird als
+        // "(inaktiv)"/"(alt)"-Chip angezeigt — geht beim Speichern nie verloren.
+        let savedColorExtra = null;
         if (m.farbe && !allowedColorNames.includes(m.farbe)) {
-            m.farbe = '';
+            const cDef = (cachedColors||[]).find(c => c.name === m.farbe);
+            savedColorExtra = { name: m.farbe, flag: cDef ? '(inaktiv)' : '(alt)', bg: cDef?.bg };
         }
-        const colorOptionsHtml = '<option value="" disabled' + (!m.farbe ? ' selected' : '') + '>— Farbe wählen —</option>' +
-            allowedColorNames.map(name =>
-                `<option value="${escHtml(name)}"${m.farbe === name ? ' selected' : ''}>${escHtml(name)}</option>`
-            ).join('');
+        // v1.19.26: Color-Chips statt Dropdown — 1-Klick-Auswahl, sofort sichtbare Farbpunkte
+        const colorChipsHtml = `<div class="color-chips" style="display:flex;flex-wrap:wrap;gap:5px${!m.farbe ? ';padding:6px;border:2px solid var(--amber);border-radius:8px;background:#fffbeb' : ''}">${
+            (savedColorExtra ? [savedColorExtra] : []).concat(allowedColorNames.map(name => ({ name, flag: '' }))).map(item => {
+                const name = item.name;
+                const colorDef = (cachedColors||[]).find(c => c.name === name);
+                const bg = item.bg || colorDef?.bg || '#888';
+                const isActive = m.farbe === name;
+                const flag = item.flag || '';
+                const dim = flag ? 'opacity:0.6;' : '';
+                return `<button type="button"${flag?' title="Diese Farbe ist deaktiviert – bleibt für diese Bestellung erhalten"':''} onclick="updateMeasure(${i},'farbe','${escHtml(name).replace(/'/g,"\\'")}')" style="${dim}display:inline-flex;align-items:center;gap:6px;padding:5px 11px 5px 5px;border-radius:999px;border:1.5px solid ${isActive?'var(--primary)':'var(--border)'};background:${isActive?'var(--primary-bg)':'var(--card)'};font-size:12px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit"><span style="width:18px;height:18px;border-radius:50%;background:${bg};border:2px solid rgba(0,0,0,0.08);flex-shrink:0"></span>${escHtml(name)}${flag?' '+flag:''}</button>`;
+            }).join('')
+        }</div>`;
 
         // Maß-Grenzen aus Modell oder Defaults
         const limits = (currentModel && currentModel.measureLimits) || { minBreite: 1, maxBreite: MAX_MASS_CM, minHoehe: 1, maxHoehe: MAX_MASS_CM };
@@ -1577,13 +1777,8 @@ function renderNewForm() {
         const breiteOob = breiteVal > 0 && (breiteVal < limits.minBreite || breiteVal > limits.maxBreite);
         const hoeheOob = hoeheVal > 0 && (hoeheVal < limits.minHoehe || hoeheVal > limits.maxHoehe);
 
-        // Preis-Vorschlag aus Modell
-        let suggestedPrice;
-        if (currentModel && currentModel.pricing) {
-            suggestedPrice = m.doppeltuer ? (currentModel.pricing.defaultSqmPriceDoppeltuer || doppeltuerPrice) : (currentModel.pricing.defaultSqmPriceEinzeltuer || sqmPrice);
-        } else {
-            suggestedPrice = m.doppeltuer ? doppeltuerPrice : sqmPrice;
-        }
+        // v1.19.27: Preis-Vorschlag — Matrix (Türart × Netz/Plissee) wenn gesetzt, sonst Fallback
+        const suggestedPrice = computeSuggestedPrice(currentModel, m.doppeltuer, m.variants?.netz_plissee);
         const minPrice = currentModel && currentModel.pricing ? (m.doppeltuer ? (currentModel.pricing.minSqmPriceDoppeltuer || 0) : (currentModel.pricing.minSqmPriceEinzeltuer || 0)) : 0;
         const currentPrice = m.preis || suggestedPrice;
         const priceTooLow = minPrice > 0 && currentPrice > 0 && currentPrice < minPrice;
@@ -1602,34 +1797,27 @@ function renderNewForm() {
         let variantsHtml = '';
         modelVariantIds.forEach(vid => {
             const variant = getVariant(vid);
-            if (!variant || variant.active === false) return;
-            // v1.17.1: Optionen mit nurDoppeltuer ausfiltern wenn Einzeltür
-            const allOpts = (variant.options || []).filter(o => o);
-            const opts = allOpts.filter(o => !(o.nurDoppeltuer && !m.doppeltuer));
-            if (!opts.length) return;
+            if (!variant) return;
+            const savedOptForVid = m.variants[vid];
+            // v1.19.58: deaktivierte Variante nur ausblenden, wenn dieses Maß sie nicht nutzt
+            if (variant.active === false && !savedOptForVid) return;
+            // v1.17.1: Optionen mit nurDoppeltuer ausfiltern wenn Einzeltür; nur aktive Optionen
+            const activeOpts = (variant.options || []).filter(o => o && o.active !== false && !(o.nurDoppeltuer && !m.doppeltuer));
+            // v1.19.58: gespeicherte (evtl. inaktive/gelöschte) Option erhalten — KEIN Auto-Clear (Prinzip 3)
+            const optList = withSavedItem(activeOpts, variant.options, savedOptForVid, 'id');
+            if (!optList.length) return;
 
-            // Aktuell gewählte Option
-            let currentOpt = m.variants[vid];
-            // v1.18.16: tuerart wird NICHT mehr automatisch gesetzt — Mitarbeiter muss wählen.
-            // Vorher: aus m.doppeltuer abgeleitet. Jetzt: leer lassen wenn nicht explizit gewählt.
-
-            // v1.17.1: Wenn aktuelle Option durch Filter weggefallen ist, leeren — User muss neu wählen
-            if (currentOpt && !opts.find(o => o.id === currentOpt)) {
-                currentOpt = '';
-                m.variants[vid] = '';
-            }
-            // v1.18.16: KEIN automatischer Default mehr! Wenn nicht gesetzt → leer lassen.
-            // Mitarbeiter MUSS aktiv auswählen (Pflichtfeld wie Farbe).
+            // Aktuell gewählte Option (wird NIE automatisch geleert)
+            const currentOpt = savedOptForVid;
 
             // Bei Türart-forcedDoppeltuer: locked, nicht änderbar
             const isTuerartLocked = vid === 'tuerart' && forceDt !== null;
 
             // v1.18.16: ALLES als Dropdown mit "— bitte wählen —" Default.
-            // Vorher: Toggle-Buttons bei ≤3 Optionen, aber das war zu schnell-klick-anfällig.
-            // Jetzt: Mitarbeiter MUSS aktiv aus Dropdown wählen.
+            // Mitarbeiter MUSS aktiv aus Dropdown wählen.
             const placeholderOpt = `<option value=""${!currentOpt?' selected':''} disabled>— bitte wählen —</option>`;
-            const dropdownOpts = placeholderOpt + opts.map(o =>
-                `<option value="${esc(o.id)}"${currentOpt===o.id?' selected':''}>${escHtml(o.label)}</option>`
+            const dropdownOpts = placeholderOpt + optList.map(o =>
+                `<option value="${esc(o.id)}"${currentOpt===o.id?' selected':''}>${escHtml(o.label || o.name || o.id)}${inactiveSuffix(o)}</option>`
             ).join('');
             const borderStyle = !currentOpt
                 ? 'border:2px solid var(--amber);background:#fffbeb'  // Warn-Style wenn leer
@@ -1637,30 +1825,50 @@ function renderNewForm() {
             variantsHtml += `<div class="field" style="margin-top:8px"><label style="display:flex;align-items:center;gap:6px"><span>${escHtml(variant.name)}</span>${isTuerartLocked ? '<span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:normal;font-weight:400">(durch Modell vorgegeben)</span>' : ''}</label>
                 <select onchange="updateMeasureVariant(${i},'${esc(vid)}',this.value)" ${isTuerartLocked?'disabled':''} style="font-size:13px;padding:9px 8px;width:100%;${borderStyle};border-radius:8px;font-family:inherit;${isTuerartLocked?'opacity:0.6':''}">${dropdownOpts}</select></div>`;
 
+            // v1.19.28: Netz-Folgeauswahl analog Plissee-Folge — wenn aktuelle Option netzFollowup hat
+            const currentOptObj = (variant.options || []).find(o => o.id === currentOpt);
+            if (currentOptObj && currentOptObj.netzFollowup) {
+                const activeNetzColors = (cachedNetzColors || []).filter(c => c.active !== false);
+                const currentNetzColor = m.variants.netzFarbe || '';
+                // v1.19.58: gespeicherten Wert erhalten (KEIN Auto-Clear, Prinzip 3)
+                const netzList = withSavedItem(activeNetzColors, cachedNetzColors, currentNetzColor, 'id', m.netzFarbeName);
+                if (!netzList.length) {
+                    variantsHtml += `<div class="field" style="margin-top:6px;grid-column:1/-1;padding:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font-size:11px;color:#78350f">
+                        ⚠ Netz-Farben sind noch nicht angelegt. Settings → Netz-Farben → "+ Neue Netz-Farbe".
+                    </div>`;
+                } else {
+                    const netzChipsHtml = `<div style="display:flex;flex-wrap:wrap;gap:5px${!currentNetzColor?';padding:6px;border:2px solid var(--amber);border-radius:8px;background:#fffbeb':''}">${
+                        netzList.map(c => {
+                            const isActive = currentNetzColor === c.id;
+                            const sfx = inactiveSuffix(c);
+                            const dim = sfx ? 'opacity:0.6;' : '';
+                            return `<button type="button"${sfx?' title="Diese Farbe ist deaktiviert – bleibt für diese Bestellung erhalten"':''} onclick="updateMeasureVariant(${i},'netzFarbe','${esc(c.id)}')" style="${dim}display:inline-flex;align-items:center;gap:6px;padding:5px 11px 5px 5px;border-radius:999px;border:1.5px solid ${isActive?'var(--primary)':'var(--border)'};background:${isActive?'var(--primary-bg)':'var(--card)'};font-size:12px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit"><span style="width:18px;height:18px;border-radius:50%;background:${c.bg||'#888'};border:2px solid rgba(0,0,0,0.08);flex-shrink:0"></span>${escHtml(c.name)}${sfx}</button>`;
+                        }).join('')
+                    }</div>`;
+                    variantsHtml += `<div class="field" style="margin-top:6px;grid-column:1/-1"><label style="display:flex;align-items:center;gap:6px"><span>Netz-Farbe</span>${!currentNetzColor ? '<span style="color:#92400e;font-size:11px;font-weight:700">(bitte wählen)</span>' : ''}</label>${netzChipsHtml}</div>`;
+                }
+            }
             // Plissee-Folgeauswahl (v1.16.6): wenn aktuelle Option plisseeFollowup hat
-            const currentOptObj = opts.find(o => o.id === currentOpt);
             if (currentOptObj && currentOptObj.plisseeFollowup) {
                 const activePlisseeColors = (cachedPlisseeColors || []).filter(c => c.active !== false);
-                if (!activePlisseeColors.length) {
+                const currentPlisseeColor = m.variants.plisseeFarbe || '';
+                // v1.19.58: gespeicherten Wert erhalten (KEIN Auto-Clear, Prinzip 3)
+                const plisseeList = withSavedItem(activePlisseeColors, cachedPlisseeColors, currentPlisseeColor, 'id', m.plisseeFarbeName);
+                if (!plisseeList.length) {
                     variantsHtml += `<div class="field" style="margin-top:6px;padding:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font-size:11px;color:#78350f">
                         ⚠ Plissee-Farben sind noch nicht angelegt. Settings → Plissee-Farben → "+ Neue Plissee-Farbe".
                     </div>`;
                 } else {
-                    // v1.18.16: KEIN Default mehr — User muss aktiv wählen
-                    let currentPlisseeColor = m.variants.plisseeFarbe || '';
-                    if (currentPlisseeColor && !activePlisseeColors.find(c => c.id === currentPlisseeColor)) {
-                        currentPlisseeColor = '';
-                        m.variants.plisseeFarbe = '';
-                    }
-                    const plisseePlaceholder = `<option value=""${!currentPlisseeColor?' selected':''} disabled>— bitte wählen —</option>`;
-                    const plisseeOpts = plisseePlaceholder + activePlisseeColors.map(c =>
-                        `<option value="${esc(c.id)}"${currentPlisseeColor===c.id?' selected':''}>${escHtml(c.name)}</option>`
-                    ).join('');
-                    const plisseeBorderStyle = !currentPlisseeColor
-                        ? 'border:2px solid var(--amber);background:#fffbeb'
-                        : 'border:1px solid var(--border);background:var(--card)';
-                    variantsHtml += `<div class="field" style="margin-top:6px"><label style="display:flex;align-items:center;gap:6px"><span>Plissee-Farbe</span></label>
-                        <select onchange="updateMeasureVariant(${i},'plisseeFarbe',this.value)" style="font-size:13px;padding:9px 8px;width:100%;${plisseeBorderStyle};border-radius:8px;font-family:inherit">${plisseeOpts}</select></div>`;
+                    // v1.19.26: Plissee-Farbe als Color-Chips (statt Dropdown)
+                    const plisseeChipsHtml = `<div style="display:flex;flex-wrap:wrap;gap:5px${!currentPlisseeColor?';padding:6px;border:2px solid var(--amber);border-radius:8px;background:#fffbeb':''}">${
+                        plisseeList.map(c => {
+                            const isActive = currentPlisseeColor === c.id;
+                            const sfx = inactiveSuffix(c);
+                            const dim = sfx ? 'opacity:0.6;' : '';
+                            return `<button type="button"${sfx?' title="Diese Farbe ist deaktiviert – bleibt für diese Bestellung erhalten"':''} onclick="updateMeasureVariant(${i},'plisseeFarbe','${esc(c.id)}')" style="${dim}display:inline-flex;align-items:center;gap:6px;padding:5px 11px 5px 5px;border-radius:999px;border:1.5px solid ${isActive?'var(--primary)':'var(--border)'};background:${isActive?'var(--primary-bg)':'var(--card)'};font-size:12px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit"><span style="width:18px;height:18px;border-radius:50%;background:${c.bg||'#888'};border:2px solid rgba(0,0,0,0.08);flex-shrink:0"></span>${escHtml(c.name)}${sfx}</button>`;
+                        }).join('')
+                    }</div>`;
+                    variantsHtml += `<div class="field" style="margin-top:6px;grid-column:1/-1"><label style="display:flex;align-items:center;gap:6px"><span>Plissee-Farbe</span>${!currentPlisseeColor ? '<span style="color:#92400e;font-size:11px;font-weight:700">(bitte wählen)</span>' : ''}</label>${plisseeChipsHtml}</div>`;
                 }
             }
         });
@@ -1674,12 +1882,20 @@ function renderNewForm() {
                </label>`
             : '';
 
-        // Modell-Dropdown
-        const modelDropdown = showModelDropdown ? `
-            <div class="field" style="margin-bottom:8px"><label>Modell</label>
-                <select onchange="updateMeasure(${i},'modelId',this.value)" style="font-size:13px;padding:9px 8px;width:100%">
-                    ${activeModels.map(mm => `<option value="${mm.id}"${m.modelId === mm.id ? ' selected' : ''}>${escHtml(mm.name)}${mm.default ? ' ★' : ''}</option>`).join('')}
-                </select>
+        // v1.19.26: Modell als Chips statt Dropdown — 1-Klick-Auswahl
+        // v1.19.58: gespeichertes, deaktiviertes/gelöschtes Modell als "(inaktiv)"/"(alt)"-Chip erhalten
+        const modelChipList = withSavedItem(activeModels, cachedModels, m.modelId, 'id', m.modelName);
+        const modelChipsHtml = showModelDropdown ? `
+            <div class="field" style="margin-bottom:10px"><label>Modell${!m.modelId ? ' <span style="color:#92400e;font-size:11px;font-weight:700">(bitte wählen)</span>' : ''}</label>
+                <div style="display:flex;flex-wrap:wrap;gap:6px${!m.modelId ? ';padding:6px;border:2px solid var(--amber);border-radius:8px;background:#fffbeb' : ''}">
+                    ${modelChipList.map(mm => {
+                        const isActive = m.modelId === mm.id;
+                        const mc = (mm.color && /^#[0-9a-fA-F]{6}$/.test(mm.color)) ? mm.color : '';
+                        const sfx = inactiveSuffix(mm);
+                        const dim = sfx ? 'opacity:0.6;' : '';
+                        return `<button type="button"${sfx?' title="Dieses Modell ist deaktiviert – bleibt für diese Bestellung erhalten"':''} onclick="updateMeasure(${i},'modelId','${mm.id}')" style="${dim}padding:9px 14px;border-radius:999px;border:1.5px solid ${isActive?(mc||'var(--primary)'):'var(--border)'};background:${isActive?(mc||'var(--primary)'):'var(--card)'};color:${isActive?'#fff':'var(--text)'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px">${mc && !isActive ? `<span style="width:10px;height:10px;border-radius:50%;background:${mc};display:inline-block"></span>`:''}${escHtml(mm.name)}${mm.default ? ' ★' : ''}${sfx}</button>`;
+                    }).join('')}
+                </div>
             </div>` : '';
 
         const breiteStyle = breiteOob ? 'border-color:var(--red);background:#fef2f2' : '';
@@ -1691,9 +1907,12 @@ function renderNewForm() {
         <div class="measure-entry">
             ${measureFields.length>1?`<button class="remove-measure" onclick="removeMeasureField(${i})">×</button>`:''}
 
+            <!-- v1.19.26: Modell ZUERST (Preis/Varianten hängen davon ab) -->
+            ${modelChipsHtml}
+
             <!-- v1.18.17 Phase 6: Maße + Skizze responsiv (Handy=untereinander, Desktop=nebeneinander) -->
             <div class="masse-layout">
-                <!-- Linke Spalte: Maße + Stk + Farbe + Preis + Modell -->
+                <!-- Linke Spalte: Maße + Stk + Farbe + Preis -->
                 <div class="masse-layout-inputs">
                     <!-- Zeile 1: Breite × Höhe + Stk -->
                     <div style="display:flex;gap:8px;align-items:flex-end">
@@ -1702,16 +1921,14 @@ function renderNewForm() {
                         <div class="field" style="width:55px;flex-shrink:0"><label>Stk</label><input type="number" value="${m.stueck}" min="1" oninput="updateMeasure(${i},'stueck',this.value)"></div>
                     </div>
                     <div id="oobHint_${i}">${oobHint}</div>
-                    <!-- Zeile 2: Farbe + €/m² -->
+                    <!-- Zeile 2: Farbe (Color-Chips) + €/m² -->
                     <div style="display:flex;gap:8px;align-items:flex-end">
-                        <div class="field" style="flex:1"><label>Farbe</label>
-                            <select onchange="updateMeasure(${i},'farbe',this.value)" style="font-size:13px;padding:9px 8px;width:100%">${colorOptionsHtml}</select>
+                        <div class="field" style="flex:1"><label>Profil-Farbe${!m.farbe ? ' <span style="color:#92400e;font-size:11px;font-weight:700">(bitte wählen)</span>' : ''}</label>
+                            ${colorChipsHtml}
                         </div>
-                        <div class="field" style="width:75px;flex-shrink:0"><label>€/m²</label><input type="number" value="${currentPrice}" step="0.5" oninput="updateMeasure(${i},'preis',this.value)"></div>
+                        <div class="field price-protected" style="width:75px;flex-shrink:0"><label>€/m²</label><input type="number" value="${currentPrice}" step="0.5" oninput="updateMeasure(${i},'preis',this.value)"></div>
                     </div>
                     ${priceHint}
-                    <!-- Zeile 3: Modell-Dropdown -->
-                    ${modelDropdown}
                 </div>
                 <!-- Rechte Spalte: Skizze live -->
                 <div id="massePreview${i}" class="masse-layout-preview"></div>
@@ -1723,7 +1940,7 @@ function renderNewForm() {
 
             <!-- v1.18.17 Phase 3: Bemerkung pro Maß -->
             <div class="field" style="margin-top:8px"><label>Bemerkung (Maß)</label>
-                <input type="text" value="${escHtml(m.bemerkung||'')}" oninput="measureFields[${i}].bemerkung=this.value" placeholder="z.B. links anschlagend" style="font-size:13px;padding:9px 8px;width:100%">
+                <input type="text" value="${escHtml(m.bemerkung||'')}" oninput="measureFields[${i}].bemerkung=this.value" placeholder="" style="font-size:13px;padding:9px 8px;width:100%">
             </div>
         </div>`;
     }).join('');
@@ -1736,13 +1953,31 @@ function renderNewForm() {
     // Update SVG previews
     setTimeout(() => { measureFields.forEach((m,i) => updateMassePreview(i)); }, 50);
 }
+// v1.19.27: Preis-Vorschlag berechnen — Matrix (Türart × Netz/Plissee) bevorzugt,
+// sonst Fallback auf defaultSqmPriceEinzeltuer/Doppeltuer, sonst global default.
+// netzPlisseeOpt: 'netz' | 'plisee' | 'kombi' | '' (undefined falls noch nicht gewählt).
+// Kombi nutzt den Plissee-Preis (Mischung mit Plissee, oberer Preis).
+function computeSuggestedPrice(mdl, doppeltuer, netzPlisseeOpt) {
+    if (!mdl) return doppeltuer ? doppeltuerPrice : sqmPrice;
+    const p = mdl.pricing || {};
+    if (p.matrix && netzPlisseeOpt) {
+        const tk = doppeltuer ? 'doppel' : 'einzel';
+        // 'kombi' nutzt den 'plisee'-Preis
+        const np = (netzPlisseeOpt === 'kombi') ? 'plisee' : netzPlisseeOpt;
+        const v = p.matrix[tk] && p.matrix[tk][np];
+        if (Number.isFinite(v) && v > 0) return v;
+    }
+    if (doppeltuer && p.defaultSqmPriceDoppeltuer) return p.defaultSqmPriceDoppeltuer;
+    if (!doppeltuer && p.defaultSqmPriceEinzeltuer) return p.defaultSqmPriceEinzeltuer;
+    return doppeltuer ? doppeltuerPrice : sqmPrice;
+}
+
 function addMeasureField() {
-    const def = (typeof getDefaultModel === 'function') ? getDefaultModel() : null;
     measureFields.push({
         breite: '', hoehe: '', stueck: 1,
-        farbe: '', // v1.16.8-p3: Pflichtfeld — keine Vorauswahl
+        farbe: '',     // Pflichtfeld — keine Vorauswahl
         preis: sqmPrice,
-        modelId: def ? def.id : '',
+        modelId: '',   // Pflichtfeld — Mitarbeiter muss aktiv wählen
         variants: {}
     });
     renderNewForm();
@@ -1751,7 +1986,12 @@ function removeMeasureField(i) { measureFields.splice(i,1); renderNewForm(); }
 function updateMeasure(i,k,v) {
     if(k==='stueck') measureFields[i][k]=parseInt(v)||1;
     else if(k==='preis') measureFields[i][k]=parseFloat(v)||0;
-    else if(k==='farbe') measureFields[i][k]=v;
+    else if(k==='farbe') {
+        measureFields[i][k]=v;
+        // v1.19.26: Color-Chips brauchen explizites Re-Render (Dropdown updated sich selbst)
+        renderNewForm();
+        return;
+    }
     else if(k==='modelId') {
         // Modell-Wechsel: Preis-Vorschlag, Farbe, Varianten ggf. anpassen
         measureFields[i].modelId = v;
@@ -1760,9 +2000,10 @@ function updateMeasure(i,k,v) {
             // Türart-Erzwingung
             if (mdl.forcedDoppeltuer === true) measureFields[i].doppeltuer = true;
             else if (mdl.forcedDoppeltuer === false) measureFields[i].doppeltuer = false;
-            // Preis-Vorschlag aus Modell setzen (überschreibt manuell gesetzten — Frage 5: A+B+C, Vorschlag setzen, Mitarbeiter kann ändern)
+            // v1.19.27: Preis-Vorschlag nutzt Matrix (Türart × Netz/Plissee) wenn gesetzt
             const isDT = !!measureFields[i].doppeltuer;
-            const newPrice = mdl.pricing ? (isDT ? mdl.pricing.defaultSqmPriceDoppeltuer : mdl.pricing.defaultSqmPriceEinzeltuer) : (isDT ? doppeltuerPrice : sqmPrice);
+            const np = measureFields[i].variants?.netz_plissee;
+            const newPrice = computeSuggestedPrice(mdl, isDT, np);
             if (newPrice) measureFields[i].preis = newPrice;
             // Farbe prüfen — v1.16.8-p3: Pflichtfeld, kein Default mehr
             if (mdl.colors && mdl.colors.length) {
@@ -1797,11 +2038,10 @@ function updateMeasure(i,k,v) {
     }
     else if(k==='doppeltuer') {
         measureFields[i].doppeltuer = v;
-        // Preis-Vorschlag aus Modell oder Settings
+        // v1.19.27: Preis-Vorschlag aus Matrix wenn vorhanden
         const mdl = (cachedModels || []).find(mm => mm.id === measureFields[i].modelId);
-        const newPrice = mdl && mdl.pricing
-            ? (v ? mdl.pricing.defaultSqmPriceDoppeltuer : mdl.pricing.defaultSqmPriceEinzeltuer)
-            : (v ? doppeltuerPrice : sqmPrice);
+        const np = measureFields[i].variants?.netz_plissee;
+        const newPrice = computeSuggestedPrice(mdl, v, np);
         if (newPrice) measureFields[i].preis = newPrice;
         renderNewForm();
         setTimeout(()=>updateMassePreview(i),50);
@@ -1860,13 +2100,14 @@ function updateMeasureVariant(i, variantId, optionId) {
     measureFields[i].variants[variantId] = optionId;
     // Spezialfall: Türart synchronisiert mit m.doppeltuer (Code-Stabilität)
     if (variantId === 'tuerart') {
-        const isDt = optionId === 'doppel';
-        measureFields[i].doppeltuer = isDt;
-        // Preis-Vorschlag entsprechend anpassen
+        measureFields[i].doppeltuer = optionId === 'doppel';
+    }
+    // v1.19.27: Preis-Vorschlag aus Matrix bei Türart- oder Netz/Plissee-Wechsel
+    if (variantId === 'tuerart' || variantId === 'netz_plissee') {
         const mdl = (cachedModels || []).find(mm => mm.id === measureFields[i].modelId);
-        const newPrice = mdl && mdl.pricing
-            ? (isDt ? mdl.pricing.defaultSqmPriceDoppeltuer : mdl.pricing.defaultSqmPriceEinzeltuer)
-            : (isDt ? doppeltuerPrice : sqmPrice);
+        const isDt = !!measureFields[i].doppeltuer;
+        const np = measureFields[i].variants.netz_plissee;
+        const newPrice = computeSuggestedPrice(mdl, isDt, np);
         if (newPrice) measureFields[i].preis = newPrice;
     }
     renderNewForm();
@@ -1883,7 +2124,7 @@ function calcNewPrice() {
     let linesHtml='';
     measureFields.forEach((m,i) => {
         const b=parseFloat(m.breite)||0, h=parseFloat(m.hoehe)||0, s=m.stueck||1;
-        const p=m.preis||sqmPrice;
+        const p=(Number.isFinite(m.preis) ? m.preis : sqmPrice);
         const rawSqm=(b/100)*(h/100)*s;
         const sqm=rawSqm;
         const billableSqm=Math.max(rawSqm, 1*s);
@@ -1891,8 +2132,10 @@ function calcNewPrice() {
         total+=lineTotal;
         if(b&&h) {
             const minHint = rawSqm < 1*s ? ' <span style="color:var(--amber);font-size:11px;font-weight:600">(Mind. '+s+' m²)</span>' : '';
+            // v1.19.59: einheitliche, vollständige Übersicht über zentralen Helper (kompakt einzeilig)
+            const summaryStr = buildMeasureSummaryHtml(m);
             linesHtml+=`<div class="price-line">
-                <div class="price-line-desc">${b}×${h} cm ${m.farbe||'Antrazit'} ${s} Stück${minHint}</div>
+                <div class="price-line-desc">${summaryStr}${minHint}</div>
                 <div class="price-line-calc">
                     <span class="price-line-sqm">${billableSqm.toFixed(2)} m² × <input class="price-sqm-input" type="number" value="${p}" step="0.5" oninput="updateMeasure(${i},'preis',this.value)"> €/m²</span>
                     <span class="price-line-amount">€ ${lineTotal.toFixed(2)}</span>
@@ -1917,7 +2160,7 @@ function calcNewPriceFromRest() {
     // User typed a custom rest amount — recalculate Anzahlung
     let total=0;
     measureFields.forEach(m=>{
-        const b=parseFloat(m.breite)||0, h=parseFloat(m.hoehe)||0, s=m.stueck||1, p=m.preis||sqmPrice;
+        const b=parseFloat(m.breite)||0, h=parseFloat(m.hoehe)||0, s=m.stueck||1, p=(Number.isFinite(m.preis) ? m.preis : sqmPrice);
         const rawSqm2=(b/100)*(h/100)*s; total+=Math.max(rawSqm2, 1*s)*p;
     });
     const rest=parseFloat(document.getElementById('newRestbetrag').value)||0;
@@ -1976,7 +2219,7 @@ function renderMeasureVariantPills(measure, opts) {
 
     Object.keys(mv).forEach(vid => {
         if (vid === 'tuerart') return; // schon oben als Pill behandelt
-        if (vid === 'plisseeFarbe') return;
+        if (vid === 'plisseeFarbe' || vid === 'netzFarbe') return; // als Folgefarben unten angehängt
         const variant = (typeof getVariant === 'function') ? getVariant(vid) : null;
         if (!variant) return;
         const opt = (variant.options || []).find(o => o.id === mv[vid]);
@@ -1986,10 +2229,23 @@ function renderMeasureVariantPills(measure, opts) {
         let label = opt.label;
         const isYesLike = /^(ja|yes)$/i.test(opt.label || '');
         if (isYesLike) label = variant.name;
-        // Wenn Plissee-Followup: Plissee-Farbe direkt anhängen
-        if (opt.plisseeFollowup && mv.plisseeFarbe) {
-            const pc = (typeof getPlisseeColor === 'function') ? getPlisseeColor(mv.plisseeFarbe) : null;
-            if (pc) label = (isYesLike ? variant.name : opt.label) + ' - ' + pc.name;
+        const base = isYesLike ? variant.name : opt.label;
+        // v1.19.59: Folgefarben — Namen-stored-first. Bei EINZEL-Modus (nur Netz / nur
+        // Plissee) kein doppeltes "Netz" → nur die Farbe; bei Kombi beide mit Basis-Label.
+        const netzNm = (opt.netzFollowup && mv.netzFarbe)
+            ? (measure.netzFarbeName || ((typeof getNetzColor === 'function') ? getNetzColor(mv.netzFarbe)?.name : '')) : '';
+        const plisseeNm = (opt.plisseeFollowup && mv.plisseeFarbe)
+            ? (measure.plisseeFarbeName || ((typeof getPlisseeColor === 'function') ? getPlisseeColor(mv.plisseeFarbe)?.name : '')) : '';
+        const followupCount = (opt.netzFollowup ? 1 : 0) + (opt.plisseeFollowup ? 1 : 0);
+        if (followupCount >= 2) {
+            const fc = [];
+            if (netzNm) fc.push('Netz: ' + netzNm);
+            if (plisseeNm) fc.push('Plissee: ' + plisseeNm);
+            if (fc.length) label = base + ' - ' + fc.join(', ');
+        } else if (opt.netzFollowup) {
+            if (netzNm) label = 'Netz: ' + netzNm;
+        } else if (opt.plisseeFollowup) {
+            if (plisseeNm) label = 'Plissee: ' + plisseeNm;
         }
         pills.push({
             label: label,
@@ -2120,7 +2376,7 @@ function openSignatureModal(orderId, orderData) {
         <canvas id="sigCanvas" style="width:100%;height:200px;border:2px solid var(--border);border-radius:10px;background:white;touch-action:none;cursor:crosshair"></canvas>
         <div style="display:flex;gap:8px;margin-top:12px">
             <button onclick="clearSignature()" style="padding:10px;background:var(--border-light);color:var(--text-secondary);border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🗑️ Löschen</button>
-            <button onclick="document.getElementById('signatureOverlay').remove()" style="flex:1;padding:12px;background:var(--border-light);color:var(--text);border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Abbrechen</button>
+            <button onclick="document.getElementById('signatureOverlay').remove()" style="flex:1;padding:12px;background:var(--border-light);color:var(--text);border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">← Retour</button>
             <button id="sigSaveBtn" onclick="saveSignature('${orderId}')" disabled style="flex:1;padding:12px;background:#16a34a;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;opacity:0.4">✓ Bestätigen</button>
         </div>
     </div>`;
@@ -2280,6 +2536,13 @@ async function saveNewOrder() {
                     return;
                 }
             }
+            // v1.19.28: Netz-Folgeauswahl analog
+            if (optObj && optObj.netzFollowup) {
+                if (!m.variants.netzFarbe) {
+                    showToast('Bitte für Maß ' + (mi + 1) + ': Netz-Farbe auswählen.', 'warning');
+                    return;
+                }
+            }
         }
         // Türart: muss explizit gewählt sein (außer Modell hat forcedDoppeltuer)
         if (varIds.includes('tuerart') && mdl.forcedDoppeltuer === undefined && (!m.variants || !m.variants.tuerart)) {
@@ -2295,7 +2558,7 @@ async function saveNewOrder() {
         return;
     }    let totalPrice=0, totalSqm=0;
     const measures=valid.map(m=>{
-        const b=parseFloat(m.breite),h=parseFloat(m.hoehe),s=m.stueck||1,p=m.preis||sqmPrice;
+        const b=parseFloat(m.breite),h=parseFloat(m.hoehe),s=m.stueck||1,p=(Number.isFinite(m.preis) ? m.preis : sqmPrice);
         const sqm=(b/100)*(h/100)*s;
         const billSqm=Math.max(sqm, 1*s);
         totalSqm+=sqm; totalPrice+=billSqm*p;
@@ -2310,23 +2573,38 @@ async function saveNewOrder() {
             measureObj.bemerkung = '';
             measureObj.materialColors = {};
         }
+        attachMeasureNames(measureObj); // v1.19.59: Namen mitspeichern
         return measureObj;
     });
     try {
-        // Generate order number - find highest existing number for this year
+        // v1.19.37: Geteilter Counter mit Webshop via settings/orderCounter (Transaktion).
+        // Catch-up: nimmt Max(counter, lokale orders-Liste) damit Webshop und App nicht divergieren.
         const year = new Date().getFullYear();
-        let maxNum = year === 2026 ? 149 : 0;
+        let localMax = 0;
         orders.forEach(o => {
             if (!o.orderNumber) return;
             const match = o.orderNumber.match(/#(\d{4})-(\d+)/);
             if (match && parseInt(match[1]) === year) {
-                maxNum = Math.max(maxNum, parseInt(match[2]));
+                localMax = Math.max(localMax, parseInt(match[2]));
             }
         });
-        const orderNumber = '#' + year + '-' + String(maxNum + 1).padStart(5, '0');
+        const counterRef = db.collection('settings').doc('orderCounter');
+        const nextNum = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(counterRef);
+            const cdata = snap.exists ? snap.data() : {};
+            const counterValue = (cdata.year === year) ? (cdata.lastNumber || 0) : 0;
+            const next = Math.max(counterValue, localMax) + 1;
+            tx.set(counterRef, {
+                year,
+                lastNumber: next,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            return next;
+        });
+        const orderNumber = '#' + year + '-' + String(nextNum).padStart(5, '0');
 
         const newDocRef = await db.collection('orders').add({
-            vorname,nachname,telefon,farbe:measures[0].farbe, orderNumber,
+            vorname,nachname,telefon, orderNumber,
             measures, totalSqm:parseFloat(totalSqm.toFixed(4)), totalPrice:parseFloat(totalPrice.toFixed(2)), anzahlung,
             payments: anzahlung > 0 ? [{amount:anzahlung, date:firebase.firestore.Timestamp.now(), label:'Anzahlung'}] : [],
             bestelldatum:bestelldatum||null, frist:frist||null, bemerkung:bemerkung||null, column:'Bestellung', paid:false,

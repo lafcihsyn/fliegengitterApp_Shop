@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.18.23-status-perms';
+const CACHE_NAME = 'fliegengitter-v1.20.9-kombi-falten';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -14,6 +14,8 @@ const STATIC_ASSETS = [
   '/js/08-order.js',
   '/js/09-prodstats.js',
   '/js/10-search.js',
+  '/js/11-buchhaltung.js',
+  '/js/12-mat-forecast.js',
   'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,400&display=swap'
 ];
 
@@ -54,7 +56,12 @@ self.addEventListener('fetch', event => {
                  url.pathname === '/' ||
                  url.pathname.endsWith('.html');
 
-  if (isHTML) {
+  // v1.18.25: JS/CSS auch network-first — sonst hängt das Frontend Tage nach
+  // Updates noch auf alten Versionen (Chrome-PWAs besonders hartnäckig). Cache
+  // ist nur noch Offline-Fallback. Bilder/Icons/Fonts bleiben cache-first.
+  const isScriptOrStyle = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+
+  if (isHTML || isScriptOrStyle) {
     event.respondWith(
       fetch(event.request).then(response => {
         if (response && response.status === 200) {
@@ -67,7 +74,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for static assets (CSS, JS, images, fonts)
+  // Cache-first für statische Assets die sich selten ändern (Bilder, Icons, Fonts).
   event.respondWith(
     caches.match(event.request).then(cached => {
       const fetchPromise = fetch(event.request).then(response => {

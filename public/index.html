@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" translate="no" class="notranslate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <!-- v1.19.56: Browser-Auto-Translate komplett deaktivieren (Kundennamen sollen nicht übersetzt werden) -->
+    <meta name="google" content="notranslate">
     <meta name="theme-color" content="#534AB7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,6 +13,32 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <title>Fliegengitter</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Buchhaltung: nutzt IMMER die volle verfügbare Bildschirmbreite
+           (auch auf Tablet/Smartphone-Querformat), da die Tabelle 9 Spalten
+           hat und in 520px nicht sinnvoll lesbar ist. */
+        #tab-buchhaltung > .container {
+            max-width: 100% !important;
+            width: 100%;
+            padding: 12px 14px;
+        }
+        @media (min-width: 1500px) {
+            #tab-buchhaltung > .container { max-width: 1400px !important; margin: 0 auto; }
+        }
+        /* Tabellen-Spalten: nicht umbrechen, AKTIONEN feste Breite,
+           damit Icons garantiert nebeneinander stehen. */
+        #tab-buchhaltung table { table-layout: auto; min-width: 900px; }
+        #tab-buchhaltung table th, #tab-buchhaltung table td { white-space: nowrap; }
+        #tab-buchhaltung table td:nth-child(3) { white-space: normal; min-width: 130px; max-width: 200px; }
+        #tab-buchhaltung table th:last-child, #tab-buchhaltung table td:last-child {
+            width: 90px; min-width: 90px;
+        }
+        #tab-buchhaltung table td:last-child button,
+        #tab-buchhaltung table td:last-child a {
+            display: inline-flex; align-items: center; justify-content: center;
+            vertical-align: middle;
+        }
+    </style>
 </head>
 <body>
 
@@ -120,6 +148,11 @@
             Bestandsübersicht
             <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
         </button>
+        <button class="menu-item" onclick="menuNav('matforecast')" data-tab="matforecast">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+            Materialbedarf
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
         <button class="menu-item" onclick="menuNav('wareneingang')" data-tab="wareneingang">
             <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
             Wareneingang
@@ -143,6 +176,12 @@
             <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
         </button>
 
+        <div class="menu-section" id="menu-buchhaltung-section">Buchhaltung</div>
+        <button class="menu-item" onclick="menuNav('buchhaltung')" data-tab="buchhaltung" id="menu-buchhaltung-item">
+            <div class="menu-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></div>
+            Online Zahlungen
+            <span class="menu-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>
 
         <div class="menu-section">Einstellungen</div>
         <button class="menu-item" onclick="menuNav('settings')" data-tab="settings">
@@ -180,6 +219,14 @@
                     <button class="color-btn btn-weiss" onclick="selectColor(this,'Weiß','#e0e0e0','#444')" style="flex:1;padding:6px;font-size:12px">Weiß</button>
                     <button class="color-btn btn-braun" onclick="selectColor(this,'Braun','#8B4513','#fac775')" style="flex:1;padding:6px;font-size:12px">Braun</button>
                 </div>
+                <!-- v1.19.9: Modell + Varianten-Picker für eigenständige Schnittliste-Berechnung -->
+                <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+                    <span style="font-size:10px;color:var(--text-muted);font-weight:600;flex-shrink:0">MODELL</span>
+                    <select id="rechnerModelId" onchange="onRechnerModelChange()" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-family:inherit">
+                        <option value="">— ohne Modell —</option>
+                    </select>
+                </div>
+                <div id="rechnerVariantsContainer" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px"></div>
             </div>
             <div class="card" id="summaryCard" style="padding:0;overflow:hidden;">
                 <div class="summary" id="summaryContainer" style="position:relative;">
@@ -249,13 +296,13 @@
                         <div class="field"><label>Breite (cm)</label><input type="number" id="bwareBreite" placeholder="z.B. 100" oninput="calcBwarePreview()"></div>
                         <div class="field"><label>Höhe (cm)</label><input type="number" id="bwareHoehe" placeholder="z.B. 200" oninput="calcBwarePreview()"></div>
                     </div>
-                    <div style="display:flex;gap:8px;margin-bottom:10px">
-                        <div class="field" style="flex:2"><label>Farbe</label>
-                            <select id="bwareFarbe" style="font-size:13px;padding:9px 8px;width:100%">
-                                <option value="Antrazit">Antrazit</option>
-                                <option value="Weiß">Weiß</option>
-                                <option value="Braun">Braun</option>
-                            </select>
+                    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                        <div class="field" style="flex:1;min-width:140px"><label>Modell</label>
+                            <select id="bwareModelId" style="font-size:13px;padding:9px 8px;width:100%"></select>
+                        </div>
+                        <div class="field" style="flex:1;min-width:140px"><label>Farbe</label>
+                            <!-- v1.19.49: Optionen werden dynamisch von showBwareForm() / updateBwareColorOptions() befüllt (cachedColors + Modell-Restriktion). -->
+                            <select id="bwareFarbe" style="font-size:13px;padding:9px 8px;width:100%"></select>
                         </div>
                     </div>
                     <div id="bwarePreview" style="display:none;padding:10px;background:var(--border-light);border-radius:8px;margin-bottom:10px;font-size:13px"></div>
@@ -292,8 +339,8 @@
             <div class="card">
                 <div class="card-label">Neue Bestellung</div>
                 <div class="input-row mb-12">
-                    <div class="field"><label>Vorname</label><input type="text" id="newVorname" placeholder="Vorname"></div>
-                    <div class="field"><label>Nachname</label><input type="text" id="newNachname" placeholder="Nachname"></div>
+                    <div class="field"><label>Vorname</label><input type="text" id="newVorname" placeholder="Vorname" oninput="sanitizeNameInput(this)" autocomplete="given-name"></div>
+                    <div class="field"><label>Nachname</label><input type="text" id="newNachname" placeholder="Nachname" oninput="sanitizeNameInput(this)" autocomplete="family-name"></div>
                 </div>
                 <div class="field mb-12"><label>Telefon</label>
                     <div class="tel-row">
@@ -322,7 +369,7 @@
                 <div id="newMeasures"></div>
                 <button class="add-measure-btn" onclick="addMeasureField()">＋ Artikel hinzufügen</button>
             </div>
-            <div class="card">
+            <div class="card price-protected">
                 <div class="card-label">Preisübersicht</div>
                 <div id="newPriceLines"></div>
                 <div class="price-summary" id="newPriceSummary"></div>
@@ -334,7 +381,10 @@
             <div class="card">
                 <div class="input-row mb-12">
                     <div class="field"><label>Bestelldatum</label><input type="date" id="newBestelldatum"></div>
-                    <div class="field"><label>Fristdatum</label><input type="date" id="newFrist"><div id="fristVorschlagHint" style="display:none"></div></div>
+                    <div class="field"><label>Frist</label>
+                        <input type="date" id="newFrist" style="width:100%" oninput="this.dataset.touched='1'">
+                        <div id="fristVorschlagHint" style="font-size:11px;color:var(--text-muted);margin-top:4px"></div>
+                    </div>
                 </div>
                 <div class="field"><label>Bemerkung</label><textarea id="newBemerkung" class="full-input" placeholder="Optionale Bemerkung..." style="margin-bottom:0"></textarea></div>
                 <div class="field" id="newFilialeField" style="display:none;margin-top:8px"><label>Filiale</label>
@@ -357,6 +407,12 @@
                 <div style="font-size:10px;color:#78350f;margin-top:8px;line-height:1.4">
                     <strong>Bestellen ✓</strong> = Telefon ist Pflicht. Eine richtige Bestellnummer wird vergeben, der Entwurf gelöscht.
                 </div>
+            </div>
+
+            <!-- v1.20.1: Aktivitäten-Log für Entwürfe (nur im Entwurfs-Modus sichtbar) -->
+            <div id="draftActivityCard" class="card" style="display:none;margin-bottom:10px">
+                <div class="card-label">Aktivitäten</div>
+                <div id="draftActivityLog"></div>
             </div>
 
             <div id="bottomActionsBar" style="display:flex;gap:8px;margin-bottom:20px">
@@ -385,26 +441,89 @@
         </div>
     </div>
 
+    <!-- BUCHHALTUNG → ONLINE ZAHLUNGEN -->
+    <div id="tab-buchhaltung" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0">Online Zahlungen</span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                        <select id="buchhaltungPeriod" onchange="onBuchhaltungPeriodChange()" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:8px;font-family:inherit">
+                            <option value="day">Heute</option>
+                            <option value="week">Diese Woche</option>
+                            <option value="month" selected>Diesen Monat</option>
+                            <option value="year">Dieses Jahr</option>
+                            <option value="custom">Zeitraum…</option>
+                        </select>
+                        <button onclick="exportBuchhaltungCSV()" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);cursor:pointer;font-family:inherit" title="CSV-Export für Excel">📄 CSV</button>
+                        <button onclick="exportBuchhaltungPDF()" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);cursor:pointer;font-family:inherit" title="PDF-Export / Drucken">🖨️ PDF</button>
+                    </div>
+                </div>
+                <div id="buchhaltungCustomRange" style="display:none;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+                    <span style="font-size:12px;color:var(--text-muted)">Von</span>
+                    <input type="date" id="buchhaltungFrom" onchange="renderBuchhaltung()" style="padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:inherit">
+                    <span style="font-size:12px;color:var(--text-muted)">bis</span>
+                    <input type="date" id="buchhaltungTo" onchange="renderBuchhaltung()" style="padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:inherit">
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);margin-top:10px;cursor:pointer">
+                    <input type="checkbox" id="buchhaltungShowTest" onchange="renderBuchhaltung()" style="cursor:pointer">
+                    Test-Zahlungen (Sandbox) einblenden
+                </label>
+            </div>
+            <div id="buchhaltungSummary"></div>
+            <div id="buchhaltungTable"></div>
+        </div>
+    </div>
+
     <!-- SETTINGS -->
     <div id="tab-settings" class="tab-content">
         <div class="container">
             <div class="card">
                 <div class="card-label">Einstellungen</div>
-                <div class="setting-row">
+                <div class="setting-row price-protected">
                     <div><div class="setting-label">m²-Preis (€)</div><div class="setting-desc">Preis pro Quadratmeter</div></div>
                     <input type="number" class="setting-input" id="sqmPrice" inputmode="decimal" value="25" step="0.5" oninput="saveSqmPrice();calcNewPrice()">
                 </div>
-                <div class="setting-row">
+                <div class="setting-row price-protected">
                     <div><div class="setting-label"><span style="display:inline-flex;vertical-align:middle;margin-right:3px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/><path d="M12 2v20"/><circle cx="15.5" cy="12" r="0.7" fill="currentColor"/><circle cx="8.5" cy="12" r="0.7" fill="currentColor"/></svg></span> Doppeltür €/m²</div><div class="setting-desc">Preis für Doppeltür pro m²</div></div>
                     <input type="number" class="setting-input" id="doppeltuerPriceInput" inputmode="decimal" class="setting-input-restricted" value="60" step="0.5" oninput="saveDoppeltuerPrice()">
                 </div>
                 <div class="setting-row">
                     <div><div class="setting-label"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span> Benachrichtigungen</div><div class="setting-desc">Bei neuen Bestellungen benachrichtigen</div></div>
-                    <button class="logout-btn" id="pushToggleBtn" onclick="requestPushPermission()">Aktivieren</button>
+                    <button class="logout-btn" id="pushToggleBtn" onclick="togglePush()">Aktivieren</button>
                 </div>
                 <div class="setting-row">
                     <div><div class="setting-label">Spalten verwalten</div><div class="setting-desc">Board-Spalten hinzufügen/entfernen</div></div>
                     <button class="logout-btn" onclick="manageColumns()">Bearbeiten</button>
+                </div>
+                <div class="setting-row">
+                    <div>
+                        <div class="setting-label">🖨️ Drucker-Server URL</div>
+                        <div class="setting-desc">Adresse des Termux-Print-Servers (Tablet-IP). Z.B. <code style="font-size:11px">http://192.168.178.25:8150</code></div>
+                    </div>
+                    <input type="text" class="setting-input" id="printServerUrl" inputmode="url" placeholder="http://192.168.178.25:8150" style="min-width:220px" oninput="savePrintServerUrl()">
+                </div>
+            </div>
+            <div class="card" id="fristModeCard">
+                <div class="card-label">⏱ Frist-Berechnung</div>
+                <div class="setting-desc" style="margin-bottom:10px">Wie die dem Kunden gezeigte „Voraussichtliche Fertigstellung" bestimmt wird.</div>
+                <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;cursor:pointer">
+                    <input type="radio" name="fristMode" id="fristModeAuto" onchange="saveFristMode()" style="width:18px;height:18px;margin-top:2px;accent-color:var(--primary)">
+                    <span><b>Automatisch</b><br><span style="font-size:12px;color:var(--text-muted)">System-Durchschnitt (offene Stück ÷ Tagesleistung)</span></span>
+                </label>
+                <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;cursor:pointer">
+                    <input type="radio" name="fristMode" id="fristModeManual" onchange="saveFristMode()" style="width:18px;height:18px;margin-top:2px;accent-color:var(--primary)">
+                    <span><b>Manuell</b><br><span style="font-size:12px;color:var(--text-muted)">Feste Spanne in Wochen — z.B. bei Urlaub / großem Auftragsstau</span></span>
+                </label>
+                <div id="fristManualFields" style="display:none;margin-top:8px;padding:12px;background:#f0eeff;border-radius:10px">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <span>von</span>
+                        <input type="number" class="setting-input" id="fristFromWeeks" min="0" step="1" value="2" style="width:64px" inputmode="numeric" oninput="saveFristMode()">
+                        <span>bis</span>
+                        <input type="number" class="setting-input" id="fristToWeeks" min="0" step="1" value="4" style="width:64px" inputmode="numeric" oninput="saveFristMode()">
+                        <span>Wochen</span>
+                    </div>
+                    <div id="fristManualPreview" style="font-size:12px;color:var(--primary);font-weight:600;margin-top:8px"></div>
                 </div>
             </div>
             <div class="card" id="notifyTextCard">
@@ -412,12 +531,58 @@
                 <div class="edit-field"><label>WhatsApp-Nachricht</label>
                     <textarea id="settingsNotifyText" class="full-input" style="min-height:80px;margin-bottom:0;text-align:left" oninput="saveNotifyText()" placeholder="Hallo {name}, Ihre Fliegengitter-Bestellung ist fertig..."></textarea>
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:6px">{name} = Kundenname · {rest} = offener Betrag</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:6px">{name} = Kundenname · {rest} = offener Betrag · {bestellnummer} = Bestellnummer (wird in WhatsApp fett angezeigt)</div>
             </div>
 
             <div class="card" id="abzugSettingsCard">
                 <div class="card-label"><span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg></span> Schnittmaße (Abzüge)</div>
                 <div style="font-size:13px;color:var(--text-muted);padding:8px;line-height:1.5">Die Schnittmaße werden seit v1.12 direkt am jeweiligen Material gepflegt. Öffne dazu in der Material-Verwaltung das gewünschte Material und bearbeite die Liste der Schnittmaße.</div>
+            </div>
+
+            <!-- v1.19.5: Webshop-Hero-Banner (nur Admin) -->
+            <div class="card" id="heroImagesCard" style="display:none">
+                <div class="card-label">🎨 Webshop-Startseite Banner</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">
+                    Bilder für den großen Slider auf der Startseite. Mehrere Bilder = automatische Rotation (alle 5 Sek).
+                    Mit ▲▼ sortieren, erstes Bild = erstes angezeigt. Bilder werden komprimiert (max 1600 px).
+                </div>
+                <div id="heroImagesList" style="margin-bottom:8px"></div>
+                <input type="file" id="heroImageUpload" accept="image/*" multiple style="display:none" onchange="onHeroImageUpload(event)">
+                <button type="button" onclick="document.getElementById('heroImageUpload').click()" style="padding:8px 12px;font-size:12px;background:var(--primary-bg);color:var(--primary);border:1px solid var(--primary);border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">+ Bilder hochladen</button>
+            </div>
+
+            <!-- v1.19.3: Rechtliche Texte für den Webshop (nur Admin) -->
+            <div class="card" id="legalTextsCard" style="display:none">
+                <div class="card-label">📜 Rechtliche Texte (Webshop)</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">
+                    AGB, Datenschutz, Impressum für die Webshop-Seite. Änderungen werden sofort am Webshop sichtbar.<br>
+                    <strong>Formatierung:</strong> <code style="font-size:11px">## Überschrift</code> für Heading, leere Zeile für Absatz, <code style="font-size:11px">**fett**</code> für fett.
+                </div>
+
+                <div class="edit-field">
+                    <label>AGB · Allgemeine Geschäftsbedingungen</label>
+                    <textarea id="legalAgb" class="full-input" style="min-height:240px;margin-bottom:6px;text-align:left;font-family:monospace;font-size:12px;line-height:1.5" placeholder="## 1. Geltungsbereich
+Diese AGB gelten…"></textarea>
+                    <button class="action-btn primary" onclick="saveLegalText('agb')">AGB speichern</button>
+                </div>
+
+                <div class="edit-field" style="margin-top:18px">
+                    <label>Datenschutzerklärung</label>
+                    <textarea id="legalDatenschutz" class="full-input" style="min-height:240px;margin-bottom:6px;text-align:left;font-family:monospace;font-size:12px;line-height:1.5" placeholder="## Verantwortlicher
+…"></textarea>
+                    <button class="action-btn primary" onclick="saveLegalText('datenschutz')">Datenschutz speichern</button>
+                </div>
+
+                <div class="edit-field" style="margin-top:18px">
+                    <label>Impressum</label>
+                    <textarea id="legalImpressum" class="full-input" style="min-height:180px;margin-bottom:6px;text-align:left;font-family:monospace;font-size:12px;line-height:1.5" placeholder="**Firma**
+Adresse…"></textarea>
+                    <button class="action-btn primary" onclick="saveLegalText('impressum')">Impressum speichern</button>
+                </div>
+
+                <div style="font-size:11px;color:var(--text-muted);margin-top:14px;padding-top:10px;border-top:1px solid var(--border-light)">
+                    <span id="legalLastUpdate"></span>
+                </div>
             </div>
 
             <!-- Firmendaten (v1.16.2) - für PDF-Druck und Etikett -->
@@ -514,6 +679,41 @@
                     <div id="plisseeColorsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
                 </div>
 
+                <!-- v1.19.25 — Netz-Farben (für Netz-Stoff, z.B. Schwarz, Grau) -->
+                <div class="card" id="netzColorsCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Netz-Farben</span>
+                        <button class="action-btn primary" onclick="openNetzColorForm()" style="padding:6px 14px;font-size:12px">+ Neue Netz-Farbe</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Netz-Stoff-Farben (z.B. Schwarz, Grau). Werden bei Variante "Netz" zur Auswahl angeboten. Inaktive sind ausgeblendet.</div>
+                    <div id="netzColorsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                </div>
+
+                <!-- v1.19.12 / v1.19.13: Netz-Breiten — abgelöst durch Material-Dimensionen.
+                     Card bleibt sichtbar bis User migriert hat (oder Daten manuell löscht). -->
+                <div class="card" id="netzBreitenCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Netz-Breiten <span style="font-size:10px;color:var(--amber);font-weight:700;padding:2px 6px;border-radius:6px;background:#fef3c7;margin-left:6px">DEPRECATED</span></span>
+                        <button class="action-btn" onclick="migrateNetzBreitenToDimensions()" style="padding:6px 14px;font-size:12px;background:var(--amber);color:white">↦ Auf Material-Dimensionen migrieren</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
+                        Diese Stammdaten wurden durch <strong>„Material-Dimensionen"</strong> abgelöst (universell für alle Material-Typen). Klicke „Migrieren" → vorhandene Breiten werden nach Material-Dimensionen kopiert und in allen betroffenen Materialien automatisch verknüpft. Danach kannst Du diese Einträge hier löschen.
+                    </div>
+                    <div id="netzBreitenList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                </div>
+
+                <!-- v1.19.13: Generische Material-Dimensionen für ALLE Material-Typen (rolle, stange, stueck, netz, flaeche) -->
+                <div class="card" id="materialDimensionsCard">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                        <span class="card-label" style="margin-bottom:0">Material-Dimensionen</span>
+                        <button class="action-btn primary" onclick="openMaterialDimensionForm()" style="padding:6px 14px;font-size:12px">+ Neue Dimension</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+                        Generische Größen-/Maß-Stammdaten für beliebige Materialien (z.B. 67×700 für Bürstendichtung, 14 mm für Plastikband, 350 cm für Netz). Jedes Material kann mehrere Dimensionen anhaken — Lager wird dann pro Material+Dimension getrennt geführt.
+                    </div>
+                    <div id="materialDimensionsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
+                </div>
+
                 <div class="card" id="variantsCard">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
                         <span class="card-label" style="margin-bottom:0">Varianten</span>
@@ -532,19 +732,8 @@
                     <div id="modelsList"><div style="font-size:13px;color:var(--text-muted);padding:8px;text-align:center">Wird geladen...</div></div>
                 </div>
 
-                <div class="card" id="migrationCard">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-                        <span class="card-label" style="margin-bottom:0">Migration auf Modell-System</span>
-                    </div>
-                    <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">
-                        Konvertiert die heutigen Stammdaten (Farben aus Materialien, Türart aus Bestellungen) und legt das Modell <strong>"Klassik"</strong> mit allen heutigen Materialien an. <strong>Vorher Backup ziehen!</strong>
-                    </div>
-                    <div id="migrationStatus" style="font-size:12px;margin-bottom:8px;padding:10px;background:var(--bg-light);border-radius:8px;line-height:1.6"></div>
-                    <div style="display:flex;gap:8px">
-                        <button class="action-btn" onclick="checkMigrationStatus()" style="background:var(--border-light);color:var(--text-secondary)">Status prüfen</button>
-                        <button class="action-btn primary" onclick="runMigration()">Migration starten</button>
-                    </div>
-                </div>
+                <!-- v1.19.54: Migration-Card entfernt — beide Migrationen sind abgeschlossen.
+                     Funktionen runMigration/checkMigrationStatus bleiben im JS für Notfall-Console-Zugriff. -->
             </div>
 
             <div class="card">
@@ -562,6 +751,9 @@
                     <select id="inviteFiliale" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
                         <option value="">— Filiale wählen —</option>
                     </select>
+                </div>
+                <div class="edit-field" style="margin-top:4px">
+                    <label class="checkbox-label"><input type="checkbox" id="inviteSendMail" checked> Passwort-Reset-Mail an Mitarbeiter senden (empfohlen)</label>
                 </div>
                 <button class="action-btn primary" onclick="inviteUser()" style="margin-top:4px">Mitarbeiter anlegen</button>
                 <div id="inviteMsg" style="font-size:13px;text-align:center;margin-top:10px;min-height:18px"></div>
@@ -617,11 +809,13 @@
                     </select>
                 </div>
                 <div id="weColorField" style="display:none" class="edit-field"><label>Farbe</label>
-                    <select id="weColor" style="width:100%;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
-                        <option value="Antrazit">Antrazit</option>
-                        <option value="Weiß">Weiß</option>
-                        <option value="Braun">Braun</option>
-                    </select>
+                    <!-- v1.19.49: Optionen werden dynamisch von 04-stock.js (onMaterialChange) befüllt — basiert auf cachedColors+material.colors. -->
+                    <select id="weColor" style="width:100%;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
+                </div>
+                <!-- v1.19.13: Generischer Dimensionen-Dropdown (gilt für ALLE Material-Typen) -->
+                <div class="edit-field" id="weDimensionField" style="display:none">
+                    <label>Größe</label>
+                    <select id="weDimension" style="width:100%;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
                 </div>
                 <div id="weFieldsStange" style="display:none">
                     <div class="input-row mb-12">
@@ -630,14 +824,24 @@
                     </div>
                 </div>
                 <div id="weFieldsNetz" style="display:none">
+                    <!-- v1.19.12: m²-basierte Erfassung. Mitarbeiter wählt Breite + gibt Pakete + Länge ein. -->
                     <div class="input-row mb-12">
-                        <div class="field"><label>Anzahl Rollen</label><input type="number" id="weNetzAnzahl" min="1" value="1"></div>
-                        <div class="field"><label>Faltenanzahl/Rolle</label><input type="number" id="weNetzFalten" min="1"></div>
+                        <div class="field"><label>Anzahl Pakete</label><input type="number" id="weNetzAnzahl" min="1" value="1" oninput="updateNetzM2Preview()"></div>
+                        <div class="field"><label>Paket-Länge (m)</label><input type="number" id="weNetzLaenge" min="0.1" step="0.1" placeholder="z.B. 30" oninput="updateNetzM2Preview()"></div>
                     </div>
-                    <div class="edit-field"><label>Höhe/Länge (cm)</label>
-                        <div style="display:flex;gap:6px;align-items:center">
-                            <select id="weNetzHoehe" onchange="document.getElementById('weNetzHoeheCustom').value=this.value" style="flex:1;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
-                            <input type="number" id="weNetzHoeheCustom" placeholder="oder frei eingeben" step="0.5" style="flex:1;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                    <div class="edit-field" id="weFieldsNetzBreite" style="display:none">
+                        <label>Breite</label>
+                        <select id="weNetzBreite" onchange="updateNetzM2Preview()" style="width:100%;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
+                    </div>
+                    <div id="weNetzM2Preview" style="font-size:12px;color:var(--text-muted);margin-top:6px;padding:8px 10px;background:var(--bg-light);border-radius:6px;display:none"></div>
+                    <!-- Legacy Felder: nur sichtbar wenn Material keine Breiten hinterlegt hat -->
+                    <div id="weFieldsNetzLegacy" style="display:none">
+                        <div class="edit-field"><label>Faltenanzahl/Rolle (optional)</label><input type="number" id="weNetzFalten" min="0"></div>
+                        <div class="edit-field"><label>Höhe/Länge (cm) — Legacy</label>
+                            <div style="display:flex;gap:6px;align-items:center">
+                                <select id="weNetzHoehe" onchange="document.getElementById('weNetzHoeheCustom').value=this.value" style="flex:1;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
+                                <input type="number" id="weNetzHoeheCustom" placeholder="oder frei eingeben" step="0.5" style="flex:1;padding:10px 12px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -658,7 +862,7 @@
                 </div>
                 <div class="input-row mb-12">
                     <div class="field"><label>Datum</label><input type="date" id="weDatum"></div>
-                    <div class="field"><label>Preis € (optional)</label><input type="number" id="wePreis" step="0.01" placeholder="Gesamt"></div>
+                    <div class="field price-protected"><label>Preis € (optional)</label><input type="number" id="wePreis" step="0.01" placeholder="Gesamt"></div>
                 </div>
                 <div class="edit-field"><label>Lieferant (optional)</label><input type="text" id="weLieferant" placeholder="z.B. Großhändler"></div>
                 <div class="edit-field"><label>Bemerkung (optional)</label><input type="text" id="weBemerkung" placeholder=""></div>
@@ -691,6 +895,22 @@
         </div>
     </div>
 
+    <!-- MATERIALBEDARF (v1.19.48) -->
+    <div id="tab-matforecast" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-label-row">
+                    <span class="card-label" style="margin-bottom:0">Materialbedarf — offene Bestellungen</span>
+                    <button class="reset-btn" onclick="loadMatForecast()" style="font-size:12px">↻</button>
+                </div>
+                <select id="forecastFilialeSelect" onchange="loadMatForecast()" style="width:100%;padding:8px 12px;font-size:13px;font-weight:600;border:2px solid var(--primary);border-radius:var(--radius-sm);font-family:inherit;color:var(--primary);background:var(--card);margin-top:8px">
+                    <option value="">Alle Filialen</option>
+                </select>
+            </div>
+            <div id="matForecastContent"><div class="loading" style="padding:12px">Wird geladen...</div></div>
+        </div>
+    </div>
+
     <!-- INVENTUR -->
     <div id="tab-inventur" class="tab-content">
         <div class="container">
@@ -720,6 +940,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <script src="js/01-helpers.js"></script>
 <script src="js/02-i18n.js"></script>
 <script>
@@ -735,6 +957,17 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+// ═══ FCM PUSH (v1.20.0) ═══
+// Öffentlicher VAPID-Web-Push-Key (kein Geheimnis — wird an Browser ausgeliefert).
+const FCM_VAPID_KEY = 'BATklkfeKQKY0mP7WMFKmpCV0ywYkXgNOc-BviZpLOVuRLHNVQAKzrSMyKXL3FB63GsWwyvo1-XP26WqL0O7cXQ';
+let messaging = null;
+function initMessaging() {
+    if (messaging) return messaging;
+    try { messaging = firebase.messaging(); }
+    catch (e) { console.warn('[FCM] nicht unterstützt:', e.message); messaging = null; }
+    return messaging;
+}
+
 // ═══ TOAST & CONFIRM ═══
 
 // ═══ Helpers (showToast, showConfirm) sind in js/01-helpers.js ═══
@@ -745,7 +978,7 @@ let currentUser = null;
 // Default-Werte verhindern ReferenceError wenn renderAll() vor dem Laden von 03-auth.js läuft
 let currentUserRole = 'mitarbeiter';
 let currentUserPerms = {};
-let boardColumns = ['Reparatur', 'Warteliste', 'Bestellung', 'In Produktion', 'Abholbereit', 'Abgeholt', 'B-Ware', 'Gelöscht'];
+let boardColumns = ['Reparatur', 'Warteliste', 'Bestellung', 'In Produktion', 'Transport', 'Abholbereit', 'Abgeholt', 'B-Ware', 'Gelöscht'];
 let activeColumn = 'Bestellung';
 let filialen = [];
 let currentUserFiliale = '';
@@ -755,6 +988,9 @@ let rechnerOrderId = '';
 let cachedMaterials = [];
 let cachedColors = [];
 let cachedPlisseeColors = []; // v1.16.5 — Plissee-Farben (eigene Stammdaten)
+let cachedNetzColors = []; // v1.19.25 — Netz-Farben (z.B. Schwarz, Grau)
+let cachedNetzBreiten = []; // v1.19.12 — Netz-Breiten (Stammdaten, z.B. 240/300 cm)
+let cachedMaterialDimensions = []; // v1.19.13 — Generische Material-Dimensionen für alle Material-Typen
 let cachedVariants = [];
 let cachedModels = [];
 let cachedCompanyData = null; // v1.16.2 — Firmendaten für PDF/Etikett
@@ -781,6 +1017,51 @@ function getPlisseeColor(id) {
     return cachedPlisseeColors.find(c => c.id === id) || null;
 }
 
+// ═══ NETZ-FARBEN (v1.19.25) ═══
+async function loadNetzColors() {
+    try {
+        const snap = await db.collection('netz_colors').orderBy('sortOrder').get();
+        cachedNetzColors = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+        console.error('loadNetzColors:', e);
+        cachedNetzColors = [];
+    }
+}
+function getNetzColor(id) {
+    return cachedNetzColors.find(c => c.id === id) || null;
+}
+
+// ═══ NETZ-BREITEN (v1.19.12) ═══
+async function loadNetzBreiten() {
+    try {
+        const snap = await db.collection('netz_breiten').orderBy('sortOrder').get();
+        cachedNetzBreiten = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+        console.error('loadNetzBreiten:', e);
+        cachedNetzBreiten = [];
+    }
+}
+
+function getNetzBreite(id) {
+    return cachedNetzBreiten.find(b => b.id === id) || null;
+}
+
+// ═══ MATERIAL-DIMENSIONEN (v1.19.13) ═══
+// Generische Größen-/Maß-Stammdaten — anwendbar auf jeden Material-Typ.
+async function loadMaterialDimensions() {
+    try {
+        const snap = await db.collection('material_dimensions').orderBy('sortOrder').get();
+        cachedMaterialDimensions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+        console.error('loadMaterialDimensions:', e);
+        cachedMaterialDimensions = [];
+    }
+}
+
+function getMaterialDimension(id) {
+    return cachedMaterialDimensions.find(d => d.id === id) || null;
+}
+
 async function loadVariants() {
     try {
         const snap = await db.collection('variants').orderBy('sortOrder').get();
@@ -796,7 +1077,59 @@ async function loadModels() {
         if (typeof renderNewForm === 'function' && document.getElementById('tab-neu')?.classList.contains('active')) {
             renderNewForm();
         }
+        // Rechner-Modell-Dropdown ebenfalls neu befüllen
+        if (typeof populateRechnerModels === 'function') populateRechnerModels();
+        // v1.19.40: Board neu rendern damit Modell-Badges erscheinen wenn cachedModels
+        // erst NACH dem initial-Render geladen sind (Race-Condition beim App-Start).
+        if (typeof renderBoardCards === 'function') renderBoardCards();
     } catch(e) { console.error('loadModels:', e); }
+}
+
+// ═══ STANDALONE-RECHNER: Modell + Varianten-Picker (v1.19.9) ═══════════
+// Erlaubt es, im Schnittliste/Rechner-Tab ohne geladene Bestellung ein Modell
+// zu wählen und Varianten (z.B. Bodenprofil) zu setzen, damit Schnittliste +
+// Overrides korrekt berechnet werden.
+window._rechnerVariants = {};
+
+function populateRechnerModels() {
+    const sel = document.getElementById('rechnerModelId');
+    if (!sel) return;
+    const activeModels = (cachedModels || []).filter(m => m.active !== false);
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">— ohne Modell —</option>' +
+        activeModels.map(m => `<option value="${esc(m.id)}" ${currentVal === m.id ? 'selected' : ''}>${escHtml(m.name)}${m.default ? ' ★' : ''}</option>`).join('');
+    renderRechnerVariantPickers();
+}
+
+function onRechnerModelChange() {
+    window._rechnerVariants = {}; // Reset bei Modell-Wechsel
+    renderRechnerVariantPickers();
+    if (typeof renderAll === 'function') renderAll();
+}
+
+function renderRechnerVariantPickers() {
+    const container = document.getElementById('rechnerVariantsContainer');
+    if (!container) return;
+    const modelId = document.getElementById('rechnerModelId')?.value || '';
+    if (!modelId) { container.innerHTML = ''; return; }
+    const model = getModel(modelId);
+    const variantIds = (model && model.variantIds) || [];
+    const html = variantIds.map(vid => {
+        if (vid === 'tuerart') return ''; // wird über DT-Checkbox gesteuert
+        const variant = getVariant(vid);
+        if (!variant || !Array.isArray(variant.options)) return '';
+        const current = window._rechnerVariants[vid] || '';
+        const opts = `<option value="">— ${escHtml(variant.name)} wählen —</option>` +
+            variant.options.map(opt => `<option value="${esc(opt.id)}" ${current === opt.id ? 'selected' : ''}>${escHtml(opt.label)}</option>`).join('');
+        return `<select onchange="setRechnerVariant('${esc(vid)}', this.value)" style="flex:1;min-width:140px;padding:6px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-family:inherit">${opts}</select>`;
+    }).filter(Boolean).join('');
+    container.innerHTML = html;
+}
+
+function setRechnerVariant(vid, value) {
+    if (!value) delete window._rechnerVariants[vid];
+    else window._rechnerVariants[vid] = value;
+    if (typeof renderAll === 'function') renderAll();
 }
 
 // ═══ FIRMENDATEN (v1.16.2) ═══
@@ -925,10 +1258,17 @@ async function removeCompanyLogo() {
 function getColor(id)   { return cachedColors.find(c => c.id === id) || null; }
 function getVariant(id) { return cachedVariants.find(v => v.id === id) || null; }
 
-// Helfer: prüft ob Cut-Bedingung mit Maß-Variants matched (v1.16.7)
+// Helfer: prüft ob Cut-/Material-Bedingung mit Maß-Variants matched (v1.16.7)
+// v1.19.25: unterstützt jetzt OR-Conditions via optionIds:[...] (mehrere matchende
+// Werte). Kompatibel mit altem optionId:'foo' (= 1-Element-Array).
 function cutConditionMatches(condition, measureVariants) {
     if (!condition || !condition.variantId) return true; // keine Bedingung = immer aktiv
     const actual = (measureVariants || {})[condition.variantId];
+    // OR-Liste: optionIds:[...] — match wenn actual in einem der Werte
+    if (Array.isArray(condition.optionIds)) {
+        return condition.optionIds.includes(actual);
+    }
+    // Legacy: optionId:'foo'
     return actual === condition.optionId;
 }
 
@@ -966,16 +1306,20 @@ function slugifyId(name) {
         .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
         .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0, 40) || 'id';
 }
-const BACKUP_COLLECTIONS = ['orders', 'members', 'settings', 'materials', 'inventory_in', 'inventory_out', 'inventory_check', 'filialen', 'colors', 'variants', 'models'];
+const BACKUP_COLLECTIONS = ['orders', 'members', 'settings', 'materials', 'inventory_in', 'inventory_out', 'inventory_check', 'filialen', 'colors', 'plissee_colors', 'netz_colors', 'netz_breiten', 'material_dimensions', 'variants', 'models'];
 let orders = [];
 let drafts = [];
 let editMeasures = [];
 let summarySlides = [];
 let currentSlide = 0;
-const APP_VERSION = '1.18.23';
+const APP_VERSION = '1.20.9';
 const MAX_MASS_CM = 600; // Maximale Breite/Höhe in cm – Schutz vor Tippfehlern
 let unsubOrders = null;
 let sqmPrice = 25;
+// Frist-Modus (v1.20.8): 'auto' = System-Durchschnitt, 'manual' = feste Wochen-Spanne (z.B. Urlaub).
+let fristMode = 'auto';
+let fristFromWeeks = 2;
+let fristToWeeks = 4;
 let doppeltuerPrice = 60;
 let newOrderColor = '';
 let measureFields = [{ breite: '', hoehe: '', stueck: 1, farbe: '', preis: 0, modelId: '', variants: {} }];
@@ -1048,6 +1392,9 @@ async function loadSettings() {
         if (doc.exists) {
             const d = doc.data();
             if (d.sqmPrice) { sqmPrice = d.sqmPrice; document.getElementById('sqmPrice').value = sqmPrice; }
+            if (d.fristMode) fristMode = d.fristMode;
+            if (d.fristFromWeeks != null) fristFromWeeks = d.fristFromWeeks;
+            if (d.fristToWeeks != null) fristToWeeks = d.fristToWeeks;
             if (d.doppeltuerPrice) { doppeltuerPrice = d.doppeltuerPrice; const dEl=document.getElementById('doppeltuerPriceInput'); if(dEl) dEl.value=doppeltuerPrice; }
             if (d.notifyText) { const el=document.getElementById('settingsNotifyText'); if(el) el.value=d.notifyText; }
             if (d.abzuege && d.abzuege.length) { abzuege=d.abzuege.map(m=>({...m})); }
@@ -1081,14 +1428,59 @@ async function loadSettings() {
                     boardColumns.push('Gelöscht');
                     saveColumns();
                 }
+                // Transport-Spalte (Inegöl-Lieferung) nachrüsten — direkt nach "In Produktion".
+                // BEWUSST OHNE saveColumns(): nur in-memory pro Laden, bis das Feature live ist —
+                // sonst würde die noch-alte Live-App die Spalte aus settings/global mitbekommen.
+                // (Idempotent: wird bei jedem Laden eingefügt falls fehlend.)
+                if (!boardColumns.includes('Transport')) {
+                    const _pIdx = boardColumns.indexOf('In Produktion');
+                    if (_pIdx >= 0) boardColumns.splice(_pIdx + 1, 0, 'Transport');
+                    else boardColumns.push('Transport');
+                }
             }
         }
     } catch(e) { console.log('Settings load:', e); }
     renderBoardColumns();
+    if (typeof applyFristModeUI === 'function') applyFristModeUI();
 }
 function saveSqmPrice() {
     sqmPrice = parseFloat(document.getElementById('sqmPrice').value) || 0;
     db.collection('settings').doc('global').set({ sqmPrice, columns: boardColumns }, { merge: true }).catch(console.error);
+}
+// v1.20.8: Frist-Modus (Automatisch / manuelle Wochen-Spanne) — UI-Sync + Vorschau.
+function applyFristModeUI() {
+    const auto = document.getElementById('fristModeAuto');
+    const man = document.getElementById('fristModeManual');
+    if (!auto || !man) return;
+    auto.checked = (fristMode !== 'manual');
+    man.checked = (fristMode === 'manual');
+    const fields = document.getElementById('fristManualFields');
+    if (fields) fields.style.display = (fristMode === 'manual') ? 'block' : 'none';
+    const fw = document.getElementById('fristFromWeeks');
+    const tw = document.getElementById('fristToWeeks');
+    if (fw && document.activeElement !== fw) fw.value = fristFromWeeks;
+    if (tw && document.activeElement !== tw) tw.value = fristToWeeks;
+    const prev = document.getElementById('fristManualPreview');
+    if (prev) {
+        const a = Math.max(0, parseFloat(fristFromWeeks) || 0);
+        const b = Math.max(a, parseFloat(fristToWeeks) || 0);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const f = new Date(today); f.setDate(f.getDate() + Math.round(a*7));
+        const t = new Date(today); t.setDate(t.getDate() + Math.round(b*7));
+        const fmt = d => String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
+        prev.textContent = 'Kunde sieht: ' + fmt(f) + ' – ' + fmt(t);
+    }
+}
+function saveFristMode() {
+    const man = document.getElementById('fristModeManual');
+    fristMode = (man && man.checked) ? 'manual' : 'auto';
+    const fwEl = document.getElementById('fristFromWeeks');
+    const twEl = document.getElementById('fristToWeeks');
+    fristFromWeeks = Math.max(0, parseFloat(fwEl && fwEl.value) || 0);
+    fristToWeeks = Math.max(0, parseFloat(twEl && twEl.value) || 0);
+    db.collection('settings').doc('global').set({ fristMode, fristFromWeeks, fristToWeeks }, { merge: true }).catch(console.error);
+    applyFristModeUI();
+    if (typeof renderProductionBanner === 'function') renderProductionBanner();
 }
 function saveColumns() {
     db.collection('settings').doc('global').set({ sqmPrice, columns: boardColumns }, { merge: true }).catch(console.error);
@@ -1101,6 +1493,160 @@ function saveNotifyText() {
 function saveDoppeltuerPrice() {
     doppeltuerPrice = parseFloat(document.getElementById('doppeltuerPriceInput').value) || 60;
     db.collection('settings').doc('global').set({ doppeltuerPrice }, { merge: true }).catch(console.error);
+}
+
+// ═══ WEBSHOP HERO BILDER (v1.19.5) ═══
+async function loadHeroImages() {
+    if (!isAdmin()) return;
+    const card = document.getElementById('heroImagesCard');
+    if (card) card.style.display = '';
+    try {
+        const snap = await db.collection('settings').doc('webshopHero').get();
+        const data = snap.exists ? snap.data() : {};
+        window._heroImages = Array.isArray(data.images) ? data.images : [];
+        renderHeroImagesList();
+    } catch (e) {
+        console.error('loadHeroImages:', e);
+    }
+}
+
+function renderHeroImagesList() {
+    const el = document.getElementById('heroImagesList');
+    if (!el) return;
+    const imgs = window._heroImages || [];
+    if (!imgs.length) {
+        el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:14px;text-align:center;background:var(--bg-secondary,#f9fafb);border-radius:8px;border:1px dashed var(--border)">Noch keine Hero-Bilder. Klicke auf „+ Bilder hochladen".</div>';
+        return;
+    }
+    el.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">
+            ${imgs.map((img, i) => `
+                <div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff">
+                    <img src="${escHtml(img.url)}" style="width:100%;height:120px;object-fit:cover;display:block">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 7px;font-size:11px;background:var(--bg-secondary,#f9fafb)">
+                        <span style="font-weight:700;color:var(--text-muted)">#${i + 1}</span>
+                        <div style="display:flex;gap:3px">
+                            <button type="button" title="Nach oben" onclick="moveHeroImage(${i}, -1)" ${i === 0 ? 'disabled' : ''} style="padding:3px 6px;background:var(--card);border:1px solid var(--border);border-radius:4px;cursor:${i === 0 ? 'not-allowed' : 'pointer'};font-family:inherit;font-size:10px;opacity:${i === 0 ? '0.3' : '1'}">▲</button>
+                            <button type="button" title="Nach unten" onclick="moveHeroImage(${i}, 1)" ${i === imgs.length - 1 ? 'disabled' : ''} style="padding:3px 6px;background:var(--card);border:1px solid var(--border);border-radius:4px;cursor:${i === imgs.length - 1 ? 'not-allowed' : 'pointer'};font-family:inherit;font-size:10px;opacity:${i === imgs.length - 1 ? '0.3' : '1'}">▼</button>
+                            <button type="button" title="Löschen" onclick="deleteHeroImage(${i})" style="padding:3px 7px;background:var(--red);color:white;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:10px">×</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function moveHeroImage(idx, dir) {
+    const imgs = window._heroImages || [];
+    const target = idx + dir;
+    if (target < 0 || target >= imgs.length) return;
+    [imgs[idx], imgs[target]] = [imgs[target], imgs[idx]];
+    imgs.forEach((img, i) => { img.sortOrder = i; });
+    persistHeroImages();
+    renderHeroImagesList();
+}
+
+async function deleteHeroImage(idx) {
+    const imgs = window._heroImages || [];
+    const img = imgs[idx];
+    if (!img) return;
+    showConfirm('Hero-Bild löschen?', 'Wird sofort aus Storage und Startseite entfernt.', 'Löschen', async () => {
+        try {
+            if (img.path) {
+                try { await firebase.storage().ref(img.path).delete(); } catch(e) { console.warn('Storage delete:', e); }
+            }
+            imgs.splice(idx, 1);
+            imgs.forEach((im, i) => { im.sortOrder = i; });
+            await persistHeroImages();
+            renderHeroImagesList();
+            showToast('Bild gelöscht.', 'success');
+        } catch (e) {
+            showToast('Fehler beim Löschen: ' + e.message, 'error');
+        }
+    });
+}
+
+async function onHeroImageUpload(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const btn = event.target.nextElementSibling;
+    if (btn) { btn.disabled = true; btn.textContent = `↑ Lade ${files.length} Bild(er)…`; }
+
+    try {
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            // Hero-Bilder: größer als Modell-Bilder (1920px für gute Banner-Qualität)
+            const resizedBlob = await resizeImageBlob(file, 1920, 0.85);
+            const filename = `${Date.now()}-${randomSuffix()}.jpg`;
+            const path = `hero/${filename}`;
+            const ref = firebase.storage().ref(path);
+            const snapshot = await ref.put(resizedBlob, { contentType: 'image/jpeg' });
+            const url = await snapshot.ref.getDownloadURL();
+            const imgs = window._heroImages || [];
+            imgs.push({ url, path, sortOrder: imgs.length });
+            window._heroImages = imgs;
+        }
+        await persistHeroImages();
+        renderHeroImagesList();
+        showToast(`${files.length} Hero-Bild(er) hochgeladen.`, 'success');
+    } catch (e) {
+        console.error('Hero upload error:', e);
+        showToast('Upload fehlgeschlagen: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '+ Bilder hochladen'; }
+        event.target.value = '';
+    }
+}
+
+async function persistHeroImages() {
+    if (!isAdmin()) return;
+    await db.collection('settings').doc('webshopHero').set({
+        images: window._heroImages || [],
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+}
+
+// ═══ RECHTLICHE TEXTE (v1.19.3) ═══
+async function loadLegalTexts() {
+    if (!isAdmin()) return; // Nur Admin sieht die Card
+    const card = document.getElementById('legalTextsCard');
+    if (card) card.style.display = '';
+    try {
+        const snap = await db.collection('settings').doc('legal').get();
+        const data = snap.exists ? snap.data() : {};
+        const agbEl = document.getElementById('legalAgb');
+        const dsEl = document.getElementById('legalDatenschutz');
+        const impEl = document.getElementById('legalImpressum');
+        if (agbEl) agbEl.value = data.agb || '';
+        if (dsEl) dsEl.value = data.datenschutz || '';
+        if (impEl) impEl.value = data.impressum || '';
+        const upd = data.updatedAt?.toDate ? data.updatedAt.toDate() : null;
+        const lastEl = document.getElementById('legalLastUpdate');
+        if (lastEl) lastEl.textContent = upd ? `Zuletzt aktualisiert: ${upd.toLocaleString('de-AT')}${data.updatedBy ? ' von ' + data.updatedBy : ''}` : 'Noch nie gespeichert — der Webshop zeigt aktuell den eingebauten Standard-Text.';
+    } catch (e) {
+        console.error('loadLegalTexts:', e);
+    }
+}
+
+async function saveLegalText(field) {
+    if (!isAdmin()) { showToast('Nur Admin darf rechtliche Texte ändern.', 'warning'); return; }
+    if (!['agb', 'datenschutz', 'impressum'].includes(field)) return;
+    const elId = 'legal' + field.charAt(0).toUpperCase() + field.slice(1);
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const text = el.value;
+    try {
+        await db.collection('settings').doc('legal').set({
+            [field]: text,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: getUserName() || (currentUser && currentUser.email) || 'Admin'
+        }, { merge: true });
+        showToast('Gespeichert. Webshop nutzt den neuen Text in max. 5 Min.', 'success');
+        loadLegalTexts(); // Update "zuletzt aktualisiert"
+    } catch (e) {
+        showToast('Fehler beim Speichern: ' + e.message, 'error');
+    }
 }
 
 
@@ -1139,7 +1685,9 @@ function menuNav(tab) {
     if (tab === 'materialien') { switchTab('materialien'); loadMaterials(); return; }
     if (tab === 'wareneingang') { if (!hasPerm('lager_eingang') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('wareneingang'); initWareneingang(); return; }
     if (tab === 'lager') { if (!hasPerm('lager_view') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('lager'); loadBestandsuebersicht(); return; }
+    if (tab === 'matforecast') { if (!hasPerm('lager_view') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('matforecast'); loadMatForecast(); return; }
     if (tab === 'inventur') { if (!hasPerm('lager_inventur') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('inventur'); initInventur(); return; }
+    if (tab === 'buchhaltung') { if (!hasPerm('buchhaltung_view') && !isAdmin()) { showToast('Keine Berechtigung.','warning'); return; } switchTab('buchhaltung'); initBuchhaltung(); return; }
     switchTab(tab);
 }
 
@@ -1151,31 +1699,17 @@ function switchTab(name) {
         const currentTab = document.querySelector('.tab-item.active')?.dataset?.tab;
         const isAlreadyOnNeu = currentTab === 'neu';
         const isEditingDraft = (typeof editingDraftId !== 'undefined') && editingDraftId;
-        if (!isAlreadyOnNeu && !isEditingDraft && typeof hasNewFormData === 'function' && hasNewFormData()) {
-            showConfirm(
+        // v1.20.3: Bei vorhandenen Daten 3-Knopf-Dialog (Entwurf / Verwerfen / Weiter bearbeiten).
+        // Ersetzt die alten 2 Popups, deren „Abbrechen" ins Hauptmenü sprang.
+        if (!isEditingDraft && typeof hasNewFormData === 'function' && hasNewFormData()) {
+            showChoice(
                 'Neue Bestellung beginnen?',
-                'Es sind bereits Daten eingegeben. Möchtest du verwerfen und mit einer leeren Bestellung neu anfangen?\n\nTipp: Mit "Als Entwurf speichern" kannst du die Eingabe sichern.',
-                'Verwerfen',
-                () => {
-                    if (typeof resetNewForm === 'function') resetNewForm();
-                    _switchTabInternal('neu');
-                },
-                true  // danger
-            );
-            return;
-        }
-        // Wenn der User auf "+ Neu" klickt während er schon auf "neu" ist UND Daten drin sind
-        // → auch fragen (sonst klickt er aus Versehen und vermisst die Eingabe nicht).
-        // Ohne Daten: einfach Re-Render (tut nichts schädliches).
-        if (isAlreadyOnNeu && !isEditingDraft && typeof hasNewFormData === 'function' && hasNewFormData()) {
-            showConfirm(
-                'Neue Bestellung beginnen?',
-                'Es sind bereits Daten eingegeben. Möchtest du verwerfen und mit einer leeren Bestellung neu anfangen?\n\nTipp: Mit "Als Entwurf speichern" kannst du die Eingabe sichern.',
-                'Verwerfen',
-                () => {
-                    if (typeof resetNewForm === 'function') resetNewForm();
-                },
-                true
+                'Es sind bereits Daten eingegeben. Was möchtest du tun?',
+                [
+                    { label: '📝 Als Entwurf speichern', cls: 'confirm-primary', onClick: () => { _switchTabInternal('neu'); if (typeof saveAsDraft === 'function') saveAsDraft(); } },
+                    { label: 'Verwerfen & neu beginnen', cls: 'confirm-danger', onClick: () => { if (typeof resetNewForm === 'function') resetNewForm(); _switchTabInternal('neu'); } },
+                    { label: 'Abbrechen — weiter bearbeiten', cls: 'confirm-cancel', onClick: () => { _switchTabInternal('neu'); } }
+                ]
             );
             return;
         }
@@ -1201,10 +1735,12 @@ function _switchTabInternal(name) {
     if (name === 'drafts') { cleanupExpiredDrafts(); renderDraftsList(); }
     if (name === 'settings') {
         loadMembers(); initBackupCard(); loadFilialen();
+        loadLegalTexts(); // v1.19.3 — Rechtliche Texte für Webshop (nur Admin sieht die Card)
+        loadHeroImages(); // v1.19.5 — Hero-Banner für Webshop-Startseite (nur Admin)
         const stammEl = document.getElementById('stammdatenBlock');
         if (stammEl) stammEl.style.display = (isAdmin() || isSuperAdmin()) ? 'block' : 'none';
         if (isAdmin() || isSuperAdmin()) {
-            renderColorsList(); renderPlisseeColorsList(); renderVariantsList(); renderModelsList();
+            renderColorsList(); renderPlisseeColorsList(); renderNetzColorsList(); renderNetzBreitenList(); renderMaterialDimensionsList(); renderVariantsList(); renderModelsList();
         }
         // Firmendaten-Karte befüllen (v1.16.2) - sichtbar nur für Admin/Superadmin
         const companyCard = document.getElementById('companyDataCard');
@@ -1223,7 +1759,7 @@ function _switchTabInternal(name) {
 function manageColumns() { const m=document.getElementById('columnsManager'); m.style.display=m.style.display==='none'?'block':'none'; renderColumnsEdit(); }
 function renderColumnsEdit() {
     document.getElementById('columnsListEdit').innerHTML = boardColumns.map((col,i) => {
-        const def=['Bestellung','In Produktion','Abholbereit','Abgeholt','Gelöscht'].includes(col);
+        const def=['Bestellung','In Produktion','Transport','Abholbereit','Abgeholt','Gelöscht'].includes(col);
         return `<div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border-light)"><span style="font-size:14px;font-weight:500">${col}</span>${!def?`<button class="reset-btn" onclick="removeColumn(${i})" style="color:var(--red)">Entfernen</button>`:'<span style="font-size:11px;color:var(--text-muted)">Standard</span>'}</div>`;
     }).join('');
 }
@@ -1277,10 +1813,22 @@ async function inviteUser() {
             createdBy: currentUser ? currentUser.email : 'unknown'
         });
         await secondaryAuth.signOut();
+        // v1.19.24: Optional Welcome-Mail (Passwort-Reset) verschicken
+        const sendMail = document.getElementById('inviteSendMail')?.checked;
+        let mailNote = '';
+        if (sendMail) {
+            try {
+                await auth.sendPasswordResetEmail(email);
+                mailNote = ' · ✉️ Mail wurde gesendet';
+            } catch(mailErr) {
+                mailNote = ' · ⚠️ Mail-Versand fehlgeschlagen (' + (mailErr.code || mailErr.message) + ')';
+                console.error('inviteUser sendPasswordResetEmail:', mailErr);
+            }
+        }
         document.getElementById('inviteEmail').value = '';
         document.getElementById('inviteKurzname').value = '';
         document.getElementById('invitePassword').value = '';
-        msgEl.textContent = '✅ ' + email + ' wurde erfolgreich angelegt!';
+        msgEl.textContent = '✅ ' + email + ' angelegt' + mailNote;
         msgEl.style.color = 'var(--green)';
         loadMembers();
     } catch(e) {
@@ -1299,7 +1847,9 @@ async function loadMembers() {
     el.innerHTML = '<div class="loading" style="padding:12px">Wird geladen...</div>';
     try {
         const snap = await db.collection('members').orderBy('name').get();
-        if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px">Keine Mitglieder gefunden.</div>'; return; }
+        if (snap.empty) { el.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px">Keine Mitglieder gefunden.</div>'; window.cachedMembers = []; return; }
+        // v1.19.18: cachedMembers global für Mitarbeiter-Drill-down
+        window.cachedMembers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
         // SVG-Icons (Lucide-Stil)
         const SVG_SHIELD = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>';
@@ -1321,30 +1871,62 @@ async function loadMembers() {
             const canEditPerms = !isYou && (isSuperAdmin() || (isAdmin() && role !== 'admin'));
 
             // Rolle-Badge (immer sichtbar als Info, mit/ohne Klick)
-            const roleBadge = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;background:${role==='admin'?'var(--primary)':'var(--border-light)'};color:${role==='admin'?'white':'var(--text-muted)'};font-weight:600;${canToggleRole?'cursor:pointer':''}" ${canToggleRole?`onclick="toggleRole('${d.id}','${role}')" title="Rolle wechseln"`:''}>${SVG_SHIELD}${roleLabel}</span>`;
+            const roleBadge = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;background:${role==='admin'?'var(--primary)':'var(--border-light)'};color:${role==='admin'?'white':'var(--text-muted)'};font-weight:600;${canToggleRole?'cursor:pointer':''}" ${canToggleRole?`onclick="event.stopPropagation();toggleRole('${d.id}','${role}')" title="Rolle wechseln"`:''}>${SVG_SHIELD}${roleLabel}</span>`;
 
             // Filiale-Badge
             const filialeText = m.filialeName || 'Keine Filiale';
             const hasFiliale = !!m.filialeName;
             const filialeBadge = isAdmin()
-                ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;border:1px solid var(--primary);background:var(--primary-bg);color:var(--primary);font-weight:600;cursor:pointer" onclick="editMemberFiliale('${d.id}','${m.filialeId||''}')" title="Filiale ändern">${SVG_BUILDING}${filialeText}</span>`
+                ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;border:1px solid var(--primary);background:var(--primary-bg);color:var(--primary);font-weight:600;cursor:pointer" onclick="event.stopPropagation();editMemberFiliale('${d.id}','${m.filialeId||''}')" title="Filiale ändern">${SVG_BUILDING}${filialeText}</span>`
                 : (hasFiliale ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;background:var(--primary-bg);color:var(--primary);font-weight:600">${SVG_BUILDING}${filialeText}</span>` : '');
 
             // Action-Buttons (kompakt, mit Icons)
             const permBtn = canEditPerms
-                ? `<button onclick="openPermEditor('${d.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-weight:600;cursor:pointer;font-family:inherit">${SVG_KEY}Rechte</button>`
+                ? `<button onclick="event.stopPropagation();openPermEditor('${d.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-weight:600;cursor:pointer;font-family:inherit">${SVG_KEY}Rechte</button>`
                 : '';
             const nameBtn = isAdmin() && !isYou
-                ? `<button onclick="editMemberName('${d.id}','${(m.name||'').replace(/'/g,"\\'")}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-weight:600;cursor:pointer;font-family:inherit">${SVG_USER_EDIT}Name</button>`
+                ? `<button onclick="event.stopPropagation();editMemberName('${d.id}','${(m.name||'').replace(/'/g,"\\'")}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-weight:600;cursor:pointer;font-family:inherit">${SVG_USER_EDIT}Name</button>`
+                : '';
+            // v1.19.24: Passwort-Reset-Mail senden + Mitarbeiter entfernen (nur Admin)
+            const mailBtn = isAdmin() && !isYou && m.email
+                ? `<button onclick="event.stopPropagation();sendPasswordResetMail('${(m.email||'').replace(/'/g,"\\'")}','${d.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-weight:600;cursor:pointer;font-family:inherit" title="Passwort-Reset-Mail senden">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Mail
+                </button>`
+                : '';
+            const deleteBtn = isAdmin() && !isYou
+                ? `<button onclick="event.stopPropagation();deleteMember('${d.id}','${(m.name||m.email||'').replace(/'/g,"\\'")}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid #fecaca;background:#fef2f2;color:var(--red);font-weight:600;cursor:pointer;font-family:inherit" title="Mitarbeiter entfernen">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>Entfernen
+                </button>`
+                : '';
+            // v1.19.61: Mitarbeiter deaktivieren/aktivieren (Zugang sperren, Historie bleibt)
+            const isMemberActive = m.active !== false;
+            const isSuperA = (typeof SUPERADMIN_EMAIL !== 'undefined' && m.email === SUPERADMIN_EMAIL);
+            const escName = (m.name||m.email||'').replace(/'/g,"\\'");
+            const activeBtn = (isAdmin() && !isYou && !isSuperA)
+                ? (isMemberActive
+                    ? `<button onclick="event.stopPropagation();toggleMemberActive('${d.id}', false, '${escName}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;font-weight:600;cursor:pointer;font-family:inherit" title="Zugang sperren – Mitarbeiter kann sich nicht mehr anmelden">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>Deaktivieren
+                    </button>`
+                    : `<button onclick="event.stopPropagation();toggleMemberActive('${d.id}', true, '${escName}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:8px;border:1px solid #bbf7d0;background:#f0fdf4;color:#15803d;font-weight:600;cursor:pointer;font-family:inherit" title="Mitarbeiter wieder freischalten">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>Aktivieren
+                    </button>`)
                 : '';
 
-            return `<div class="member-item" style="display:flex;gap:10px;align-items:flex-start;padding:12px 4px;border-bottom:1px solid var(--border-light)">
+            // v1.19.18: Klick auf ganze Member-Card öffnet Drill-down mit produzierten Bestellungen
+            // v1.19.23: Klick + Cursor nur wenn Mitarbeiter-Leistung-Permission gegeben
+            const memberEmail = (m.email||'').replace(/'/g,"\\'");
+            const canDrill = hasPerm('mitarbeiter_leistung_view');
+            const drillAttrs = canDrill
+                ? `style="display:flex;gap:10px;align-items:flex-start;padding:12px 4px;border-bottom:1px solid var(--border-light);cursor:pointer;border-radius:6px;transition:background 0.15s" onclick="openMemberDrillDown('${memberEmail}')" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''" title="Produzierte Bestellungen anzeigen"`
+                : `style="display:flex;gap:10px;align-items:flex-start;padding:12px 4px;border-bottom:1px solid var(--border-light)"`;
+            return `<div class="member-item" ${drillAttrs}>
                 <div class="member-avatar" style="flex-shrink:0">${initial}</div>
-                <div style="flex:1;min-width:0">
+                <div style="flex:1;min-width:0${!isMemberActive ? ';opacity:0.55' : ''}">
                     <!-- Zeile 1: Name + DU-Badge -->
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
                         <span style="font-weight:700;font-size:14px;color:var(--text)">${name}</span>
                         ${isYou ? '<span class="member-you" style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--primary);color:white;font-weight:700;letter-spacing:0.04em">DU</span>' : ''}
+                        ${!isMemberActive ? '<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:var(--text-muted);color:white;font-weight:700;letter-spacing:0.04em">INAKTIV</span>' : ''}
                     </div>
                     <!-- Zeile 2: Email -->
                     <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis">${m.email||''}</div>
@@ -1356,7 +1938,7 @@ async function loadMembers() {
                         ${filialeBadge}
                     </div>
                     <!-- Zeile 5: Aktions-Buttons -->
-                    ${(permBtn || nameBtn) ? `<div style="display:flex;flex-wrap:wrap;gap:5px">${permBtn}${nameBtn}</div>` : ''}
+                    ${(permBtn || nameBtn || mailBtn || activeBtn || deleteBtn) ? `<div style="display:flex;flex-wrap:wrap;gap:5px">${permBtn}${nameBtn}${mailBtn}${activeBtn}${deleteBtn}</div>` : ''}
                 </div>
             </div>`;
         }).join('');
@@ -1364,6 +1946,700 @@ async function loadMembers() {
         el.innerHTML = '<div style="font-size:13px;color:var(--red);padding:8px">Fehler beim Laden.</div>';
         console.error(e);
     }
+}
+
+// ─── Mitarbeiter-Drill-down (v1.19.18) ──────────────────────────────
+// Klick auf Member-Card → Modal mit allen Bestellungen, die dieser Mitarbeiter
+// auf "Abholbereit" gesetzt hat. Zeitraum umschaltbar Woche/Monat/Alle.
+// v1.19.31: Kalendarisch korrekt — Heute=00:00, Woche=Mo-So, Monat=ab 1. des aktuellen Monats
+function _drillRangeStart(range) {
+    const now = new Date();
+    const d = new Date(now);
+    d.setHours(0,0,0,0);
+    if (range === 'today') { return d; }
+    if (range === 'week') {
+        // Mo als Wochenstart: getDay() → 0=So, 1=Mo, ..., 6=Sa
+        const dow = d.getDay();
+        const offset = (dow === 0) ? 6 : dow - 1; // Sonntag: 6 Tage zurück, sonst dow-1
+        d.setDate(d.getDate() - offset);
+        return d;
+    }
+    if (range === 'month') {
+        d.setDate(1);
+        return d;
+    }
+    return new Date(0); // alle
+}
+
+// v1.19.52: Filiale-Drill-Down — Filtert nach dem Mitarbeiter-der-produziert-hat
+// und dessen Filiale. Filiale „none" = produzierende Mitarbeiter ohne Filiale-Zuordnung.
+function _producerFilialeId(o) {
+    const members = window.cachedMembers || [];
+    // Bevorzugt: abholbereitBy = Email des Produzenten → cachedMember.filialeId
+    if (o.abholbereitBy) {
+        const m = members.find(x => x && x.email === o.abholbereitBy);
+        if (m) return m.filialeId || '';
+        // Email kein bekannter Member mehr (gelöscht) → unbekannt
+        return '';
+    }
+    // Fallback: Log-Text → Name → Member-Match
+    if (o.log) {
+        const entry = o.log.find(l => l && l.text && l.text.includes('nach Abholbereit verschoben'));
+        if (entry) {
+            const m = entry.text.match(/^(\S+)\s+hat\s+/);
+            if (m) {
+                const lcName = m[1].toLowerCase();
+                const member = members.find(x => x && x.name && x.name.toLowerCase() === lcName)
+                    || members.find(x => x && x.email && x.email.split('@')[0].toLowerCase() === lcName);
+                if (member) return member.filialeId || '';
+            }
+        }
+    }
+    return '';
+}
+function getOrdersProducedByFiliale(filialeId, fromDate, toDate) {
+    if (typeof orders === 'undefined' || !Array.isArray(orders)) return [];
+    const result = [];
+    orders.forEach(o => {
+        let logDate = null;
+        if (o.abholbereitAt) {
+            logDate = o.abholbereitAt.toDate ? o.abholbereitAt.toDate()
+                    : (o.abholbereitAt.seconds ? new Date(o.abholbereitAt.seconds * 1000) : null);
+        } else if (o.log) {
+            const entry = o.log.find(l => l && l.text && l.text.includes('nach Abholbereit verschoben'));
+            if (entry) logDate = (typeof _prodstats_logDate === 'function') ? _prodstats_logDate(entry) : null;
+        }
+        if (!logDate || logDate < fromDate) return;
+        if (toDate && logDate > toDate) return;
+        // Mitarbeiter-Filiale ermitteln und gegen gewählte Filiale prüfen
+        const producerFil = _producerFilialeId(o);
+        if (filialeId === '__none__') {
+            // Nur Bestellungen die OHNE Filiale-Zuordnung produziert wurden
+            if (producerFil) return;
+        } else {
+            if (producerFil !== filialeId) return;
+        }
+        result.push({ o, logDate });
+    });
+    result.sort((a, b) => b.logDate - a.logDate);
+    return result;
+}
+
+function openFilialeDrillDown(filialeId) {
+    if (!hasPerm('mitarbeiter_leistung_view')) {
+        showToast('Keine Berechtigung für Produktions-Übersicht.', 'warning');
+        return;
+    }
+    let fname = '—';
+    if (filialeId === '__none__') {
+        fname = 'Ohne Filiale (z.B. Admin)';
+    } else {
+        const f = (typeof filialen !== 'undefined' && Array.isArray(filialen)) ? filialen.find(x => x.id === filialeId) : null;
+        if (!f) { showToast('Filiale nicht gefunden.', 'warning'); return; }
+        fname = f.name || '—';
+    }
+    let _drillCurrentRange = 'week';
+    let _drillCustomFrom = null; // Date oder null
+    let _drillCustomTo = null;   // Date oder null
+
+    const overlay = document.createElement('div');
+    overlay.className = 'edit-overlay';
+    overlay.innerHTML = `
+        <div class="edit-modal" style="max-width:820px;width:95vw">
+            <div class="edit-header">
+                <span>${escHtml(fname)}</span>
+                <button class="close-btn" onclick="this.closest('.edit-overlay').remove()">×</button>
+            </div>
+            <div class="edit-body" style="max-height:75vh;overflow:auto">
+                <div id="drillRangeToggle" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+                    <button class="drill-range-btn" data-range="today" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Heute</button>
+                    <button class="drill-range-btn active" data-range="week" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--primary);background:var(--primary);color:white;font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Diese Woche</button>
+                    <button class="drill-range-btn" data-range="month" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Dieser Monat</button>
+                    <button class="drill-range-btn" data-range="all" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Alle</button>
+                </div>
+                <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center;background:var(--bg-secondary);padding:8px;border-radius:8px">
+                    <span style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Eigener Zeitraum:</span>
+                    <input type="date" id="drillDateFrom" style="flex:1;min-width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit">
+                    <span style="font-size:11px;color:var(--text-muted)">bis</span>
+                    <input type="date" id="drillDateTo" style="flex:1;min-width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit">
+                    <button id="drillDateClear" style="padding:6px 10px;background:var(--border-light);color:var(--text-secondary);border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit" title="Zurücksetzen">×</button>
+                </div>
+                <div style="display:flex;gap:6px;margin-bottom:12px">
+                    <button id="drillBtnCsv" style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:5px" title="CSV exportieren">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV
+                    </button>
+                    <button id="drillBtnPrint" style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:5px" title="Drucken / Als PDF speichern">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Drucken / PDF
+                    </button>
+                </div>
+                <div id="drillKpi" style="padding:14px;background:var(--primary-bg);border-radius:10px;margin-bottom:12px;text-align:center">
+                    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Stück produziert</div>
+                    <div id="drillStkCount" style="font-size:28px;font-weight:800;color:var(--primary);margin-top:2px">—</div>
+                </div>
+                <div id="drillList"></div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    // Hilfsfunktionen
+    function formatMasse(o) {
+        const ms = (o.measures || []).filter(m => m.breite && m.hoehe);
+        if (!ms.length) return '—';
+        return ms.map(m => `${m.breite}x${m.hoehe}`).join(' · ');
+    }
+    function getMitarbeiter(o) {
+        // Bevorzugt direkt aus o.abholbereitByName, sonst aus Log-Text parsen
+        if (o.abholbereitByName) return o.abholbereitByName;
+        if (o.abholbereitBy) {
+            const local = o.abholbereitBy.split('@')[0];
+            return local.charAt(0).toUpperCase() + local.slice(1);
+        }
+        if (o.log) {
+            const entry = o.log.find(l => l && l.text && l.text.includes('nach Abholbereit verschoben'));
+            if (entry) {
+                const m = entry.text.match(/^(\S+)\s+hat\s+/);
+                if (m) return m[1];
+            }
+        }
+        return '—';
+    }
+
+    // v1.19.52: Resolve from/to — Custom-Dates haben Vorrang vor Range-Button
+    function _resolveRange() {
+        if (_drillCustomFrom || _drillCustomTo) {
+            const from = _drillCustomFrom || new Date(0);
+            const to = _drillCustomTo ? new Date(_drillCustomTo.getTime() + 24*60*60*1000 - 1) : null; // bis 23:59:59
+            return { from, to };
+        }
+        return { from: _drillRangeStart(_drillCurrentRange), to: null };
+    }
+    const render = (range) => {
+        if (range) _drillCurrentRange = range;
+        const { from, to } = _resolveRange();
+        const rows = getOrdersProducedByFiliale(filialeId, from, to);
+        const totalStk = rows.reduce((s, r) => s + (typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0), 0);
+        document.getElementById('drillStkCount').textContent = totalStk + (rows.length ? ` (${rows.length} Best.)` : '');
+        const listEl = document.getElementById('drillList');
+        if (!rows.length) {
+            listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:18px;text-align:center">Keine produzierten Bestellungen in diesem Zeitraum.</div>';
+            return;
+        }
+        listEl.innerHTML = `
+            <div style="display:grid;grid-template-columns:80px 1fr 1.2fr 1fr auto;gap:8px;font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:6px 4px;border-bottom:2px solid var(--border)">
+                <div>Datum</div><div>Bestellung</div><div>Maße</div><div>Mitarbeiter</div><div>Stk</div>
+            </div>
+            ${rows.map(r => {
+                const d = r.logDate;
+                const dStr = d.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit'});
+                const stk = typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0;
+                const num = r.o.orderNumber ? `<span style="font-size:11px;color:var(--text-muted);margin-right:6px">${escHtml(r.o.orderNumber)}</span>` : '';
+                const cust = escHtml(((r.o.vorname||'') + ' ' + (r.o.nachname||'')).trim() || '—');
+                const rep = r.o.isReparatur ? '🔧 ' : '';
+                const masse = escHtml(formatMasse(r.o));
+                const mit = escHtml(getMitarbeiter(r.o));
+                return `<div onclick="document.querySelector('.edit-overlay').remove();openOrderDetail('${r.o.id}')" style="display:grid;grid-template-columns:80px 1fr 1.2fr 1fr auto;gap:8px;padding:10px 4px;border-bottom:1px solid var(--border-light);cursor:pointer;align-items:center" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''">
+                    <div style="font-size:12px;color:var(--text-muted)">${dStr}</div>
+                    <div style="font-size:13px">${num}${rep}${cust}</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">${masse}</div>
+                    <div style="font-size:12px">${mit}</div>
+                    <div style="font-size:13px;font-weight:700;color:var(--primary);text-align:right">${stk}</div>
+                </div>`;
+            }).join('')}
+        `;
+    };
+
+    overlay.querySelectorAll('.drill-range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Custom-Dates zurücksetzen wenn Range-Button geklickt
+            _drillCustomFrom = null; _drillCustomTo = null;
+            const dfEl = overlay.querySelector('#drillDateFrom'); if (dfEl) dfEl.value = '';
+            const dtEl = overlay.querySelector('#drillDateTo'); if (dtEl) dtEl.value = '';
+            overlay.querySelectorAll('.drill-range-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'var(--card)';
+                b.style.color = '';
+                b.style.borderColor = 'var(--border)';
+            });
+            btn.classList.add('active');
+            btn.style.background = 'var(--primary)';
+            btn.style.color = 'white';
+            btn.style.borderColor = 'var(--primary)';
+            render(btn.dataset.range);
+        });
+    });
+    // v1.19.52: Custom-Dates Handler
+    const onCustomDateChange = () => {
+        const dfEl = overlay.querySelector('#drillDateFrom');
+        const dtEl = overlay.querySelector('#drillDateTo');
+        _drillCustomFrom = dfEl?.value ? new Date(dfEl.value + 'T00:00:00') : null;
+        _drillCustomTo = dtEl?.value ? new Date(dtEl.value + 'T00:00:00') : null;
+        // Range-Buttons visuell deaktivieren wenn Custom aktiv
+        if (_drillCustomFrom || _drillCustomTo) {
+            overlay.querySelectorAll('.drill-range-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'var(--card)';
+                b.style.color = '';
+                b.style.borderColor = 'var(--border)';
+            });
+        }
+        render();
+    };
+    overlay.querySelector('#drillDateFrom').addEventListener('change', onCustomDateChange);
+    overlay.querySelector('#drillDateTo').addEventListener('change', onCustomDateChange);
+    overlay.querySelector('#drillDateClear').addEventListener('click', () => {
+        overlay.querySelector('#drillDateFrom').value = '';
+        overlay.querySelector('#drillDateTo').value = '';
+        _drillCustomFrom = null; _drillCustomTo = null;
+        // Auf aktuellen Range-Button zurück
+        const activeBtn = overlay.querySelector(`.drill-range-btn[data-range="${_drillCurrentRange}"]`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+            activeBtn.style.background = 'var(--primary)';
+            activeBtn.style.color = 'white';
+            activeBtn.style.borderColor = 'var(--primary)';
+        }
+        render();
+    });
+
+    overlay.querySelector('#drillBtnCsv').addEventListener('click', () => {
+        const { from, to } = _resolveRange();
+        const rows = getOrdersProducedByFiliale(filialeId, from, to);
+        const rangeLabel = (_drillCustomFrom || _drillCustomTo)
+            ? `${_drillCustomFrom ? _drillCustomFrom.toISOString().slice(0,10) : 'start'}_bis_${_drillCustomTo ? _drillCustomTo.toISOString().slice(0,10) : 'heute'}`
+            : (_drillCurrentRange === 'today' ? 'heute'
+            : _drillCurrentRange === 'week' ? 'diese-Woche'
+            : _drillCurrentRange === 'month' ? 'dieser-Monat' : 'alle');
+        const head = ['Datum','Bestellnr','Kunde','Maße','Mitarbeiter','Stk','Reparatur'];
+        const csvLines = [head.join(';')];
+        rows.forEach(r => {
+            const d = r.logDate;
+            const dStr = d.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
+            const stk = typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0;
+            const num = r.o.orderNumber || '';
+            const cust = ((r.o.vorname||'') + ' ' + (r.o.nachname||'')).trim();
+            const rep = r.o.isReparatur ? 'Ja' : 'Nein';
+            const masse = formatMasse(r.o);
+            const mit = getMitarbeiter(r.o);
+            const esc = s => '"' + String(s||'').replace(/"/g,'""') + '"';
+            csvLines.push([esc(dStr),esc(num),esc(cust),esc(masse),esc(mit),stk,esc(rep)].join(';'));
+        });
+        const blob = new Blob(['﻿' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `filiale-${(fname||'unbekannt').replace(/\s+/g,'_').toLowerCase()}-${rangeLabel}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    overlay.querySelector('#drillBtnPrint').addEventListener('click', () => {
+        const { from, to } = _resolveRange();
+        const rows = getOrdersProducedByFiliale(filialeId, from, to);
+        const totalStk = rows.reduce((s, r) => s + (typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0), 0);
+        const fmtD = d => d ? d.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+        const rangeLabel = (_drillCustomFrom || _drillCustomTo)
+            ? `${fmtD(_drillCustomFrom)} – ${fmtD(_drillCustomTo)}`
+            : (_drillCurrentRange === 'today' ? 'Heute'
+            : _drillCurrentRange === 'week' ? 'Diese Woche'
+            : _drillCurrentRange === 'month' ? 'Dieser Monat' : 'Alle');
+        const todayStr = new Date().toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
+        const company = (window.cachedCompany && cachedCompany.name) ? cachedCompany.name : 'Bella Home';
+        const rowsHtml = rows.map(r => {
+            const dStr = r.logDate.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit'});
+            const stk = typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0;
+            const num = r.o.orderNumber || '—';
+            const cust = ((r.o.vorname||'') + ' ' + (r.o.nachname||'')).trim() || '—';
+            const rep = r.o.isReparatur ? ' (Reparatur)' : '';
+            const masse = formatMasse(r.o);
+            const mit = getMitarbeiter(r.o);
+            return `<tr><td>${dStr}</td><td>${escHtml(num)}</td><td>${escHtml(cust)}${rep}</td><td>${escHtml(masse)}</td><td>${escHtml(mit)}</td><td style="text-align:right">${stk}</td></tr>`;
+        }).join('') || '<tr><td colspan="6" style="padding:20px;text-align:center;color:#888">Keine produzierten Bestellungen.</td></tr>';
+        const w = window.open('', 'filialePrint', 'width=1000,height=700');
+        w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Filiale-Produktion — ${escHtml(fname)}</title>
+            <style>
+                * { box-sizing:border-box }
+                body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; padding:24px; color:#222; }
+                h1 { font-size:20px; margin:0 0 4px }
+                .meta { font-size:12px; color:#666; margin-bottom:16px }
+                .kpi { background:#f3f0ff; border:1px solid #d4cfff; border-radius:8px; padding:12px 16px; margin-bottom:16px; text-align:center }
+                .kpi b { font-size:24px; color:#534AB7 }
+                table { width:100%; border-collapse:collapse; font-size:13px }
+                th { text-align:left; padding:8px 6px; border-bottom:2px solid #534AB7; font-size:11px; text-transform:uppercase; color:#534AB7 }
+                td { padding:7px 6px; border-bottom:1px solid #eee }
+                .toolbar { text-align:center; margin-bottom:18px }
+                .toolbar button { padding:9px 20px; background:#534AB7; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600 }
+                @media print { body { padding:14mm } .toolbar { display:none } @page { size:A4 landscape; margin:12mm } }
+            </style></head><body>
+            <div class="toolbar"><button onclick="window.print()">Drucken / Als PDF speichern</button></div>
+            <h1>${escHtml(company)} — Filiale-Produktion</h1>
+            <div class="meta">
+                <strong>${escHtml(fname)}</strong><br>
+                Zeitraum: ${rangeLabel} · Stand: ${todayStr}
+            </div>
+            <div class="kpi">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#666;font-weight:700">Stück produziert</div>
+                <b>${totalStk}</b> <span style="color:#666;font-size:13px">(${rows.length} Bestellungen)</span>
+            </div>
+            <table>
+                <thead><tr><th>Datum</th><th>Bestellnr</th><th>Kunde</th><th>Maße</th><th>Mitarbeiter</th><th style="text-align:right">Stk</th></tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+            <script>setTimeout(()=>{try{window.focus()}catch(e){}}, 200);<\/script>
+            </body></html>`);
+        w.document.close();
+    });
+
+    render('week');
+}
+
+function getOrdersProducedBy(email, fromDate, toDate) {
+    if (typeof orders === 'undefined' || !Array.isArray(orders)) return [];
+    const member = (window.cachedMembers || []).find(m => m.email === email);
+    // v1.19.18: getUserName() leitet den Namen aus der Email ab (local-part, capitalized).
+    // Log-Text wurde mit DIESEM Namen geschrieben — wir müssen die gleiche Logik anwenden,
+    // nicht member.name (kann abweichen). Zusätzlich tolerieren wir Case-Insensitivität.
+    const localPart = (email || '').split('@')[0] || '';
+    const expectedLogName = localPart.charAt(0).toUpperCase() + localPart.slice(1);
+    const expectedLogNameLc = expectedLogName.toLowerCase();
+    const memberNameLc = (member && member.name) ? member.name.toLowerCase() : '';
+    const result = [];
+    orders.forEach(o => {
+        let logDate = null;
+        // 1) Neuer Pfad: abholbereitBy gesetzt
+        if (o.abholbereitBy) {
+            if (o.abholbereitBy !== email) return;
+            logDate = o.abholbereitAt && o.abholbereitAt.toDate ? o.abholbereitAt.toDate()
+                    : (o.abholbereitAt && o.abholbereitAt.seconds ? new Date(o.abholbereitAt.seconds*1000) : null);
+        } else {
+            // 2) Fallback: Log-Text parsen (historische Bestellungen ohne abholbereitBy)
+            if (!o.log) return;
+            const entry = o.log.find(l => {
+                if (!l || !l.text) return false;
+                if (!l.text.includes('nach Abholbereit verschoben')) return false;
+                const t = l.text.toLowerCase();
+                return t.startsWith(expectedLogNameLc + ' ')
+                    || (memberNameLc && t.startsWith(memberNameLc + ' '));
+            });
+            if (!entry) return;
+            logDate = (typeof _prodstats_logDate === 'function') ? _prodstats_logDate(entry) : null;
+        }
+        if (!logDate || logDate < fromDate) return;
+        if (toDate && logDate > toDate) return;
+        result.push({ o, logDate });
+    });
+    result.sort((a, b) => b.logDate - a.logDate);
+    return result;
+}
+
+function openMemberDrillDown(email) {
+    // v1.19.23: Permission-Check (Default-Deny für Mitarbeiter)
+    if (!hasPerm('mitarbeiter_leistung_view')) {
+        showToast('Keine Berechtigung für Mitarbeiter-Leistungs-Übersicht.', 'warning');
+        return;
+    }
+    const member = (window.cachedMembers || []).find(m => m.email === email);
+    if (!member) { showToast('Mitarbeiter nicht gefunden.', 'warning'); return; }
+    const name = (member.name||'').charAt(0).toUpperCase() + (member.name||'').slice(1);
+    const role = member.role === 'admin' ? 'Admin' : 'Mitarbeiter';
+    const filiale = member.filialeName || '—';
+    // Aktuell gewählter Range-State (für Export/Druck)
+    let _drillCurrentRange = 'month';
+    let _drillCustomFrom = null;
+    let _drillCustomTo = null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'edit-overlay';
+    overlay.innerHTML = `
+        <div class="edit-modal" style="max-width:720px;width:95vw">
+            <div class="edit-header">
+                <span>${escHtml(name)} — Produktion</span>
+                <button class="close-btn" onclick="this.closest('.edit-overlay').remove()">×</button>
+            </div>
+            <div class="edit-body" style="max-height:70vh;overflow:auto">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+                    ${role} · ${escHtml(filiale)} · ${escHtml(member.email||'')}
+                </div>
+                <div id="drillRangeToggle" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+                    <button class="drill-range-btn" data-range="today" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Heute</button>
+                    <button class="drill-range-btn" data-range="week" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Diese Woche</button>
+                    <button class="drill-range-btn active" data-range="month" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--primary);background:var(--primary);color:white;font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Dieser Monat</button>
+                    <button class="drill-range-btn" data-range="all" style="flex:1;min-width:80px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:12px">Alle</button>
+                </div>
+                <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center;background:var(--bg-secondary);padding:8px;border-radius:8px">
+                    <span style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Eigener Zeitraum:</span>
+                    <input type="date" id="drillDateFrom" style="flex:1;min-width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit">
+                    <span style="font-size:11px;color:var(--text-muted)">bis</span>
+                    <input type="date" id="drillDateTo" style="flex:1;min-width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit">
+                    <button id="drillDateClear" style="padding:6px 10px;background:var(--border-light);color:var(--text-secondary);border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit" title="Zurücksetzen">×</button>
+                </div>
+                <div style="display:flex;gap:6px;margin-bottom:12px">
+                    <button id="drillBtnCsv" style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:5px" title="CSV exportieren">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV
+                    </button>
+                    <button id="drillBtnPrint" style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-weight:600;cursor:pointer;font-family:inherit;font-size:11px;display:inline-flex;align-items:center;justify-content:center;gap:5px" title="Drucken / Als PDF speichern">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Drucken / PDF
+                    </button>
+                </div>
+                <div id="drillKpi" style="padding:14px;background:var(--primary-bg);border-radius:10px;margin-bottom:12px;text-align:center">
+                    <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Stück produziert</div>
+                    <div id="drillStkCount" style="font-size:28px;font-weight:800;color:var(--primary);margin-top:2px">—</div>
+                </div>
+                <div id="drillList"></div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    // v1.19.52: Custom-Dates haben Vorrang vor Range-Button
+    function _resolveRange() {
+        if (_drillCustomFrom || _drillCustomTo) {
+            const from = _drillCustomFrom || new Date(0);
+            const to = _drillCustomTo ? new Date(_drillCustomTo.getTime() + 24*60*60*1000 - 1) : null;
+            return { from, to };
+        }
+        return { from: _drillRangeStart(_drillCurrentRange), to: null };
+    }
+    const render = (range) => {
+        if (range) _drillCurrentRange = range;
+        const { from, to } = _resolveRange();
+        const rows = getOrdersProducedBy(email, from, to);
+        const totalStk = rows.reduce((s, r) => s + (typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0), 0);
+        document.getElementById('drillStkCount').textContent = totalStk + (rows.length ? ` (${rows.length} Best.)` : '');
+        const listEl = document.getElementById('drillList');
+        if (!rows.length) {
+            listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:18px;text-align:center">Keine produzierten Bestellungen in diesem Zeitraum.</div>';
+            return;
+        }
+        listEl.innerHTML = `
+            <div style="display:grid;grid-template-columns:90px 1fr auto;gap:8px;font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:6px 4px;border-bottom:2px solid var(--border)">
+                <div>Datum</div><div>Bestellung</div><div>Stk</div>
+            </div>
+            ${rows.map(r => {
+                const d = r.logDate;
+                const dStr = d.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit'});
+                const stk = typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0;
+                const num = r.o.orderNumber ? `<span style="font-size:11px;color:var(--text-muted);margin-right:6px">${escHtml(r.o.orderNumber)}</span>` : '';
+                const cust = escHtml(((r.o.vorname||'') + ' ' + (r.o.nachname||'')).trim() || '—');
+                const rep = r.o.isReparatur ? '🔧 ' : '';
+                return `<div onclick="document.querySelector('.edit-overlay').remove();openOrderDetail('${r.o.id}')" style="display:grid;grid-template-columns:90px 1fr auto;gap:8px;padding:10px 4px;border-bottom:1px solid var(--border-light);cursor:pointer;align-items:center" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background=''">
+                    <div style="font-size:12px;color:var(--text-muted)">${dStr}</div>
+                    <div style="font-size:13px">${num}${rep}${cust}</div>
+                    <div style="font-size:13px;font-weight:700;color:var(--primary)">${stk}</div>
+                </div>`;
+            }).join('')}
+        `;
+    };
+
+    overlay.querySelectorAll('.drill-range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            _drillCustomFrom = null; _drillCustomTo = null;
+            const dfEl = overlay.querySelector('#drillDateFrom'); if (dfEl) dfEl.value = '';
+            const dtEl = overlay.querySelector('#drillDateTo'); if (dtEl) dtEl.value = '';
+            overlay.querySelectorAll('.drill-range-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'var(--card)';
+                b.style.color = '';
+                b.style.borderColor = 'var(--border)';
+            });
+            btn.classList.add('active');
+            btn.style.background = 'var(--primary)';
+            btn.style.color = 'white';
+            btn.style.borderColor = 'var(--primary)';
+            render(btn.dataset.range);
+        });
+    });
+    // v1.19.52: Custom-Dates Handler
+    const onCustomDateChange = () => {
+        const dfEl = overlay.querySelector('#drillDateFrom');
+        const dtEl = overlay.querySelector('#drillDateTo');
+        _drillCustomFrom = dfEl?.value ? new Date(dfEl.value + 'T00:00:00') : null;
+        _drillCustomTo = dtEl?.value ? new Date(dtEl.value + 'T00:00:00') : null;
+        if (_drillCustomFrom || _drillCustomTo) {
+            overlay.querySelectorAll('.drill-range-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'var(--card)';
+                b.style.color = '';
+                b.style.borderColor = 'var(--border)';
+            });
+        }
+        render();
+    };
+    overlay.querySelector('#drillDateFrom').addEventListener('change', onCustomDateChange);
+    overlay.querySelector('#drillDateTo').addEventListener('change', onCustomDateChange);
+    overlay.querySelector('#drillDateClear').addEventListener('click', () => {
+        overlay.querySelector('#drillDateFrom').value = '';
+        overlay.querySelector('#drillDateTo').value = '';
+        _drillCustomFrom = null; _drillCustomTo = null;
+        const activeBtn = overlay.querySelector(`.drill-range-btn[data-range="${_drillCurrentRange}"]`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+            activeBtn.style.background = 'var(--primary)';
+            activeBtn.style.color = 'white';
+            activeBtn.style.borderColor = 'var(--primary)';
+        }
+        render();
+    });
+
+    // v1.19.23: CSV-Export
+    overlay.querySelector('#drillBtnCsv').addEventListener('click', () => {
+        const { from, to } = _resolveRange();
+        const rows = getOrdersProducedBy(email, from, to);
+        const rangeLabel = (_drillCustomFrom || _drillCustomTo)
+            ? `${_drillCustomFrom ? _drillCustomFrom.toISOString().slice(0,10) : 'start'}_bis_${_drillCustomTo ? _drillCustomTo.toISOString().slice(0,10) : 'heute'}`
+            : (_drillCurrentRange === 'today' ? 'heute'
+            : _drillCurrentRange === 'week' ? 'diese-Woche'
+            : _drillCurrentRange === 'month' ? 'dieser-Monat' : 'alle');
+        const head = ['Datum','Bestellnr','Kunde','Stk','Reparatur'];
+        const csvLines = [head.join(';')];
+        rows.forEach(r => {
+            const d = r.logDate;
+            const dStr = d.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
+            const stk = typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0;
+            const num = r.o.orderNumber || '';
+            const cust = ((r.o.vorname||'') + ' ' + (r.o.nachname||'')).trim();
+            const rep = r.o.isReparatur ? 'Ja' : 'Nein';
+            const esc = s => '"' + String(s||'').replace(/"/g,'""') + '"';
+            csvLines.push([esc(dStr),esc(num),esc(cust),stk,esc(rep)].join(';'));
+        });
+        // UTF-8 BOM für Excel-Kompat
+        const blob = new Blob(['﻿' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mitarbeiter-${(member.name||'unbekannt').replace(/\s+/g,'_').toLowerCase()}-${rangeLabel}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    // v1.19.23: Druck / Als PDF speichern (öffnet Print-Fenster)
+    overlay.querySelector('#drillBtnPrint').addEventListener('click', () => {
+        const { from, to } = _resolveRange();
+        const rows = getOrdersProducedBy(email, from, to);
+        const totalStk = rows.reduce((s, r) => s + (typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0), 0);
+        const fmtD = d => d ? d.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+        const rangeLabel = (_drillCustomFrom || _drillCustomTo)
+            ? `${fmtD(_drillCustomFrom)} – ${fmtD(_drillCustomTo)}`
+            : (_drillCurrentRange === 'today' ? 'Heute'
+            : _drillCurrentRange === 'week' ? 'Diese Woche'
+            : _drillCurrentRange === 'month' ? 'Dieser Monat' : 'Alle');
+        const todayStr = new Date().toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
+        const company = (window.cachedCompany && cachedCompany.name) ? cachedCompany.name : 'Bella Home';
+        const rowsHtml = rows.map(r => {
+            const dStr = r.logDate.toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit'});
+            const stk = typeof _prodstats_orderStk === 'function' ? _prodstats_orderStk(r.o) : 0;
+            const num = r.o.orderNumber || '—';
+            const cust = ((r.o.vorname||'') + ' ' + (r.o.nachname||'')).trim() || '—';
+            const rep = r.o.isReparatur ? ' (Reparatur)' : '';
+            return `<tr><td>${dStr}</td><td>${escHtml(num)}</td><td>${escHtml(cust)}${rep}</td><td style="text-align:right">${stk}</td></tr>`;
+        }).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#888">Keine produzierten Bestellungen.</td></tr>';
+        const w = window.open('', 'mitarbeiterPrint', 'width=900,height=700');
+        w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Mitarbeiter-Produktion — ${escHtml(name)}</title>
+            <style>
+                * { box-sizing:border-box }
+                body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; padding:24px; color:#222; }
+                h1 { font-size:20px; margin:0 0 4px }
+                .meta { font-size:12px; color:#666; margin-bottom:16px }
+                .kpi { background:#f3f0ff; border:1px solid #d4cfff; border-radius:8px; padding:12px 16px; margin-bottom:16px; text-align:center }
+                .kpi b { font-size:24px; color:#534AB7 }
+                table { width:100%; border-collapse:collapse; font-size:13px }
+                th { text-align:left; padding:8px 6px; border-bottom:2px solid #534AB7; font-size:11px; text-transform:uppercase; color:#534AB7 }
+                td { padding:7px 6px; border-bottom:1px solid #eee }
+                .toolbar { text-align:center; margin-bottom:18px }
+                .toolbar button { padding:9px 20px; background:#534AB7; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600 }
+                @media print { body { padding:14mm } .toolbar { display:none } @page { size:A4; margin:12mm } }
+            </style></head><body>
+            <div class="toolbar"><button onclick="window.print()">Drucken / Als PDF speichern</button></div>
+            <h1>${escHtml(company)} — Mitarbeiter-Produktion</h1>
+            <div class="meta">
+                <strong>${escHtml(name)}</strong> · ${escHtml(role)} · ${escHtml(filiale)} · ${escHtml(member.email||'')}<br>
+                Zeitraum: ${rangeLabel} · Stand: ${todayStr}
+            </div>
+            <div class="kpi">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#666;font-weight:700">Stück produziert</div>
+                <b>${totalStk}</b> <span style="color:#666;font-size:13px">(${rows.length} Bestellungen)</span>
+            </div>
+            <table>
+                <thead><tr><th>Datum</th><th>Bestellnr</th><th>Kunde</th><th style="text-align:right">Stk</th></tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+            <script>setTimeout(()=>{try{window.focus()}catch(e){}}, 200);<\/script>
+            </body></html>`);
+        w.document.close();
+    });
+
+    render('month');
+}
+
+// ─── Mitarbeiter-Verwaltung (v1.19.24) ──────────────────────────────
+// Passwort-Reset-Mail senden — Firebase verschickt eine Standardmail mit Link
+// zum Zurücksetzen. Eignet sich auch als Welcome-Mail: der Mitarbeiter klickt
+// den Link, vergibt selbst ein Passwort und kann sich danach einloggen.
+async function sendPasswordResetMail(email, uid) {
+    if (!isAdmin()) { showToast('Keine Berechtigung.','warning'); return; }
+    if (!email) { showToast('Keine E-Mail-Adresse hinterlegt.','warning'); return; }
+    showConfirm('Passwort-Mail senden', `Eine Mail mit Passwort-Reset-Link an <strong>${email}</strong> senden? Der Mitarbeiter kann damit selbst ein neues Passwort setzen.`, 'Senden', async () => {
+        try {
+            await auth.sendPasswordResetEmail(email);
+            showToast('✉️ Mail wurde gesendet (auch Spam-Ordner prüfen).', 'success');
+        } catch(e) {
+            let msg = 'Fehler beim Senden.';
+            if (e.code === 'auth/user-not-found') msg = 'Benutzer existiert nicht mehr in Firebase Auth — bitte zuerst neu anlegen oder Mitarbeiter entfernen.';
+            if (e.code === 'auth/invalid-email') msg = 'Ungültige E-Mail-Adresse.';
+            if (e.code === 'auth/too-many-requests') msg = 'Zu viele Versuche, später nochmal probieren.';
+            showToast(msg, 'error');
+            console.error('sendPasswordResetMail:', e);
+        }
+    }, false);
+}
+
+// Mitarbeiter entfernen — löscht den Firestore-Eintrag (App-seitig). Firebase Auth
+// kann nicht client-seitig gelöscht werden; das muss zusätzlich in der Firebase
+// Console gemacht werden. Wir zeigen einen klaren Hinweis darauf.
+async function deleteMember(uid, displayName) {
+    if (!isAdmin()) { showToast('Keine Berechtigung.','warning'); return; }
+    if (!uid) return;
+    if (currentUser && currentUser.uid === uid) { showToast('Du kannst dich nicht selbst entfernen.', 'warning'); return; }
+    showConfirm(
+        'Mitarbeiter entfernen',
+        `<strong>${escHtml(displayName||'')}</strong> aus der App entfernen?<br><br>
+        <span style="font-size:12px;color:var(--text-muted)">Hinweis: Der Login in <strong>Firebase Console</strong> wird dadurch nicht automatisch gelöscht.
+        Wenn der Account ganz gesperrt werden soll, zusätzlich in der Firebase Console → Authentication → User löschen.</span>`,
+        'Entfernen',
+        async () => {
+            try {
+                await db.collection('members').doc(uid).delete();
+                showToast('Mitarbeiter aus App entfernt.', 'success');
+                loadMembers();
+            } catch(e) {
+                showToast('Fehler: ' + e.message, 'error');
+                console.error('deleteMember:', e);
+            }
+        },
+        true  // Destructive (rote Bestätigung)
+    );
+}
+
+async function toggleMemberActive(uid, makeActive, displayName) {
+    if (!isAdmin()) { showToast('Keine Berechtigung.','warning'); return; }
+    if (!uid) return;
+    if (currentUser && currentUser.uid === uid) { showToast('Du kannst dich nicht selbst sperren.', 'warning'); return; }
+    const title = makeActive ? 'Mitarbeiter aktivieren' : 'Mitarbeiter deaktivieren';
+    const body = makeActive
+        ? `<strong>${escHtml(displayName||'')}</strong> wieder freischalten? Er/sie kann sich dann wieder anmelden.`
+        : `<strong>${escHtml(displayName||'')}</strong> den Zugang sperren?<br><br><span style="font-size:12px;color:var(--text-muted)">Kann sich nicht mehr anmelden. Bestellungen & Historie bleiben vollständig erhalten. Jederzeit wieder aktivierbar.</span>`;
+    showConfirm(title, body, makeActive ? 'Aktivieren' : 'Deaktivieren', async () => {
+        try {
+            await db.collection('members').doc(uid).update({ active: makeActive });
+            showToast(makeActive ? 'Mitarbeiter aktiviert.' : 'Mitarbeiter deaktiviert — Zugang gesperrt.', 'success');
+            loadMembers();
+        } catch(e) {
+            showToast('Fehler: ' + e.message, 'error');
+            console.error('toggleMemberActive:', e);
+        }
+    }, !makeActive);
 }
 
 async function toggleRole(uid, currentRole) {
@@ -1394,7 +2670,10 @@ async function openPermEditor(uid) {
     Object.entries(PERM_GROUPS).forEach(([groupName, groupPerms]) => {
         checksHtml += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary);margin-top:14px;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid var(--primary-bg)">${groupName}</div>`;
         Object.entries(groupPerms).forEach(([key, label]) => {
-            const checked = perms[key] ? 'checked' : '';
+            // v1.19.14: Default-Allow-Permissions sind angehakt sofern nicht explizit false.
+            const isDefaultAllow = (typeof DEFAULT_ALLOW_PERMISSIONS !== 'undefined') && DEFAULT_ALLOW_PERMISSIONS.has(key);
+            const isOn = isDefaultAllow ? (perms[key] !== false) : !!perms[key];
+            const checked = isOn ? 'checked' : '';
             const disabled = (role === 'admin' && !isSuperAdmin()) ? 'disabled' : '';
             checksHtml += `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);cursor:pointer">
                 <input type="checkbox" ${checked} ${disabled} data-perm="${key}" style="width:18px;height:18px;accent-color:var(--primary)">
@@ -1441,12 +2720,18 @@ function openBWareDetail(id, o) {
     const m = (o.measures && o.measures[0]) || {};
     const breite = parseFloat(m.breite) || 0;
     const hoehe = parseFloat(m.hoehe) || 0;
-    const farbe = m.farbe || o.farbe || '?';
+    const farbe = m.farbe || (o.measures?.[0]?.farbe) || '?'; // v1.19.50
     const tuelIdx = abzuege.findIndex(a => a.name === 'Tül');
     const enIdx = abzuege.findIndex(a => a.name === 'Profil En');
     const tuelLen = m.tuelLen || (hoehe - abzuege[tuelIdx].abzug);
     const tuelAdet = m.tuelAdet || ((breite - abzuege[enIdx].abzug) / 2);
     const logs = (o.log||[]).map(l => `<div class="activity-item"><span class="activity-time">${formatLogTime(l.time)}</span><span class="activity-text">${escHtml(l.text)}</span></div>`).join('') || '';
+    // v1.19.42: Modell-Optionen für Edit-Dropdown (Default vorausgewählt wenn noch keins gesetzt)
+    const _bwActiveModels = (Array.isArray(cachedModels) ? cachedModels : []).filter(c => c.active !== false);
+    const _bwCurrentModelId = m.modelId || (typeof getDefaultModel === 'function' && getDefaultModel() ? getDefaultModel().id : '');
+    const bwEditModelOptions = _bwActiveModels.map(c =>
+        `<option value="${c.id}"${c.id === _bwCurrentModelId ? ' selected' : ''}>${escHtml(c.name)}</option>`
+    ).join('');
 
     const cs = {'Antrazit':{bg:'#4a4a4a',text:'#fff'},'Weiß':{bg:'#e8e8e8',text:'#333'},'Braun':{bg:'#8B4513',text:'#fff'}}[farbe] || {bg:'var(--primary)',text:'#fff'};
 
@@ -1466,7 +2751,7 @@ function openBWareDetail(id, o) {
             </div>
         </div>
 
-        ${o.bemerkung ? `<div class="card"><div class="card-label">Bemerkung</div><div style="font-size:14px;color:var(--text-secondary);font-style:italic">${escHtml(o.bemerkung)}</div></div>` : ''}
+        ${o.bemerkung ? `<div class="card"><div class="card-label">Bemerkung</div><div style="font-size:14px;color:var(--text);font-style:italic">${escHtml(o.bemerkung)}</div></div>` : ''}
 
         <div class="card">
             <div class="card-label">Bearbeiten</div>
@@ -1474,12 +2759,11 @@ function openBWareDetail(id, o) {
                 <div class="field"><label>Breite (cm)</label><input type="number" id="bwEditBreite" value="${breite}" oninput="calcBwEditPreview()"></div>
                 <div class="field"><label>Höhe (cm)</label><input type="number" id="bwEditHoehe" value="${hoehe}" oninput="calcBwEditPreview()"></div>
             </div>
+            <div class="field mb-12"><label>Modell</label>
+                <select id="bwEditModelId" onchange="updateBwareColorOptions('bwEditModelId','bwEditFarbe')" style="width:100%;padding:10px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">${bwEditModelOptions}</select>
+            </div>
             <div class="field mb-12"><label>Farbe</label>
-                <select id="bwEditFarbe" style="width:100%;padding:10px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit">
-                    <option value="Antrazit"${farbe==='Antrazit'?' selected':''}>Antrazit</option>
-                    <option value="Weiß"${farbe==='Weiß'?' selected':''}>Weiß</option>
-                    <option value="Braun"${farbe==='Braun'?' selected':''}>Braun</option>
-                </select>
+                <select id="bwEditFarbe" style="width:100%;padding:10px;font-size:14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:inherit"></select>
             </div>
             <div id="bwEditPreview" style="padding:10px;background:var(--border-light);border-radius:8px;margin-bottom:10px;font-size:13px"></div>
             <div class="field mb-12"><label>Bemerkung</label><input type="text" id="bwEditBemerkung" value="${escHtml(o.bemerkung||'')}"></div>
@@ -1494,6 +2778,8 @@ function openBWareDetail(id, o) {
 
     document.getElementById('orderModal').classList.add('active');
     calcBwEditPreview();
+    // v1.19.43: Farb-Dropdown nach Modell befüllen; aktuelle Farbe als Vorauswahl behalten falls erlaubt
+    if (typeof updateBwareColorOptions === 'function') updateBwareColorOptions('bwEditModelId', 'bwEditFarbe', farbe);
 }
 
 function calcBwEditPreview() {
@@ -1512,8 +2798,10 @@ async function saveBWareEdit(id) {
     const breite = parseFloat(document.getElementById('bwEditBreite').value);
     const hoehe = parseFloat(document.getElementById('bwEditHoehe').value);
     const farbe = document.getElementById('bwEditFarbe').value;
+    const modelId = document.getElementById('bwEditModelId')?.value || '';
     const bemerkung = document.getElementById('bwEditBemerkung').value.trim();
     if (!breite || !hoehe) { showToast('Bitte Maße eingeben.', 'warning'); return; }
+    if (!modelId) { showToast('Bitte Modell wählen.', 'warning'); return; }
 
     const enIdx = abzuege.findIndex(a => a.name === 'Profil En');
     const tuelIdx = abzuege.findIndex(a => a.name === 'Tül');
@@ -1522,7 +2810,7 @@ async function saveBWareEdit(id) {
 
     await db.collection('orders').doc(id).update({
         farbe, bemerkung: bemerkung || null,
-        measures: [{ breite, hoehe, stueck: 1, farbe, sqmPrice: 0, tuelLen, tuelAdet }],
+        measures: [{ breite, hoehe, stueck: 1, farbe, sqmPrice: 0, tuelLen, tuelAdet, modelId }],
         log: firebase.firestore.FieldValue.arrayUnion({
             time: firebase.firestore.Timestamp.now(),
             text: getUserName() + ' hat B-Ware bearbeitet'
@@ -1622,12 +2910,30 @@ function onAbzugChange(i,val) {
 // Rechner summary rendering
 
 function getColorStyle(colorName) {
+    // v1.19.21: dynamisch aus Stammdaten-Farben (cachedColors) — sonst fielen
+    // eigene Farben wie "Dunkelbraun" auf den lila Default zurück.
+    if (Array.isArray(cachedColors) && colorName) {
+        const c = cachedColors.find(x => x && x.name === colorName);
+        if (c && c.bg) {
+            // Akzent: hellere Variante des bg (für SVG-Linien). Bei hellen Farben dunkler.
+            const text = c.text || (_isDarkHex(c.bg) ? '#ffffff' : '#333333');
+            return { bg: c.bg, text, accent: text === '#ffffff' ? '#cccccc' : '#666666' };
+        }
+    }
+    // Backwards-Compat (vor cachedColors): Hardcodierte Defaults
     const styles = {
         'Antrazit': { bg: '#4a4a4a', text: '#ffffff', accent: '#cccccc' },
         'Weiß': { bg: '#e8e8e8', text: '#333333', accent: '#666666' },
         'Braun': { bg: '#8B4513', text: '#ffffff', accent: '#fac775' }
     };
     return styles[colorName] || { bg: '#534AB7', text: '#ffffff', accent: '#d4d0ff' };
+}
+function _isDarkHex(hex) {
+    const h = (hex || '').replace('#','');
+    if (h.length !== 6) return true;
+    const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    // Perceived luminance (0=dark, 255=light)
+    return (0.299*r + 0.587*g + 0.114*b) < 140;
 }
 
 function renderSummary() {
@@ -1677,7 +2983,7 @@ function renderSummaryFromOrder(o) {
 
     summarySlides = expanded.map((ex, i) => {
         const m = ex._origMeasure;
-        const cs = getColorStyle(m.farbe || o.farbe || 'Antrazit');
+        const cs = getColorStyle(m.farbe || (o.measures?.[0]?.farbe) || 'Antrazit'); // v1.19.50
         return {
             kunde: (o.vorname || '') + ' ' + (o.nachname || ''),
             breite: m.breite, hoehe: m.hoehe,
@@ -1688,7 +2994,7 @@ function renderSummaryFromOrder(o) {
             // Position innerhalb der Maß-Zeile bei Duplikaten ("Stk 1 von 2")
             duplicateIndex: ex._stkInMeasure,
             duplicateTotal: ex._totalStkInMeasure,
-            farbe: m.farbe || o.farbe || 'Antrazit',
+            farbe: m.farbe || (o.measures?.[0]?.farbe) || 'Antrazit', // v1.19.50
             colorStyle: cs,
             nr: i + 1, total: totalExpanded,
             doppeltuer: !!m.doppeltuer,
@@ -1697,7 +3003,8 @@ function renderSummaryFromOrder(o) {
             frist: o.frist || '',
             // v1.16.8-p1: Variants und modelId für Pillen-Anzeige
             variants: m.variants ? Object.assign({}, m.variants) : {},
-            modelId: m.modelId || ''
+            modelId: m.modelId || '',
+            _measureIndex: ex._measureIndex // v1.20.5: echter Maß-Index (Slides sind pro Stück expandiert)
         };
     });
     currentSlide = 0;
@@ -1726,7 +3033,7 @@ function renderSummarySlides() {
         const stkShown = s.displayTotalStueck != null ? s.displayTotalStueck : (s.stueck || 1);
         // Bei Duplikaten: kleiner Hinweis "Stück 1 von 2" zeigt welches Stück innerhalb des Maßes
         const dupBadge = (s.duplicateTotal && s.duplicateTotal > 1)
-            ? `<span style="padding:4px 10px;border-radius:14px;font-size:12px;font-weight:700;background:rgba(255,255,255,0.18);letter-spacing:0.02em;color:${cs.text}">Stück ${s.duplicateIndex} von ${s.duplicateTotal}</span>`
+            ? `<span style="padding:4px 10px;border-radius:14px;font-size:12px;font-weight:700;background:rgba(255,255,255,0.18);letter-spacing:0.02em;color:${cs.text}">${t('Stück')} ${s.duplicateIndex} ${t('von')} ${s.duplicateTotal}</span>`
             : '';
         // v1.18.22: Großes Türkis-Badge oben mit "1 / 3" — auffällig, funktioniert auf jedem Hintergrund.
         // Padding seitlich (px-58) sodass die Pfeil-Buttons (width=44, right/left=10) NICHT mehr in den Text reinragen.
@@ -1736,15 +3043,16 @@ function renderSummarySlides() {
             <div style="display:flex;align-items:center;gap:12px">
                 <div style="flex:1;text-align:left;min-width:0">
                     <div style="font-size:20px;font-weight:700;margin-bottom:6px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.kunde || ''}</div>
-                    <div style="font-size:28px;font-weight:800;color:${cs.accent};line-height:1.1;margin-bottom:10px">${s.breite} × ${s.hoehe} cm</div>
+                    <div style="font-size:26px;font-weight:800;color:${cs.accent};line-height:1.1;margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.breite} × ${s.hoehe} cm</div>
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                        <span style="padding:5px 14px;border-radius:20px;font-size:14px;font-weight:700;background:rgba(255,255,255,0.25);letter-spacing:0.02em">${s.farbe}</span>
+                        <span style="padding:5px 14px;border-radius:20px;font-size:14px;font-weight:700;background:rgba(255,255,255,0.25);letter-spacing:0.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.farbe}</span>
                         <span style="font-size:16px;font-weight:700;color:${cs.accent}">Stk: ${stkShown}</span>
                         ${dupBadge}
                     </div>
                 </div>
-                <div style="flex-shrink:0">${svg}${typeof renderMeasureVariantPills === 'function' ? renderMeasureVariantPills(s, {compact:true, darkBg:isDark}) : ''}</div>
+                <div style="flex-shrink:0">${svg}</div>
             </div>
+            ${typeof renderMeasureVariantPills === 'function' ? renderMeasureVariantPills(s, {compact:true, darkBg:isDark}) : ''}
         </div>`;
     }).join('');
 
@@ -1782,15 +3090,20 @@ function applySlideMeasures() {
     document.getElementById('hoehe').value = s.hoehe;
     document.getElementById('stueckzahl').value = s.stueck;
 
-    // Update Farbe buttons
+    // Update Farbe buttons + selectedColor — v1.19.50: IMMER setzen,
+    // auch für Farben die nicht in der Legacy-3er-Liste (Antrazit/Weiß/Braun) sind.
     const farbeName = s.farbe || 'Antrazit';
-    const idx = { Antrazit: 0, 'Weiß': 1, Braun: 2 }[farbeName];
-    if (idx !== undefined) {
-        document.querySelectorAll('#tab-rechner .color-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
-        const bg = ['#4a4a4a', '#e0e0e0', '#8B4513'], cl = ['#ccc', '#444', '#fac775'];
-        farbe = { name: farbeName, bg: bg[idx], color: cl[idx] };
-        selectedColor = farbeName;
-    }
+    selectedColor = farbeName;
+    const cDef = (typeof cachedColors !== 'undefined' && Array.isArray(cachedColors))
+        ? cachedColors.find(c => c && c.name === farbeName) : null;
+    farbe = {
+        name: farbeName,
+        bg: cDef?.bg || (typeof getColorStyle === 'function' ? getColorStyle(farbeName).bg : '#534AB7'),
+        color: cDef?.text || (typeof getColorStyle === 'function' ? getColorStyle(farbeName).text : '#ffffff')
+    };
+    // Active-State der hardcodierten Legacy-Buttons mitziehen (nur visuell)
+    const legacyIdx = { Antrazit: 0, 'Weiß': 1, Braun: 2 }[farbeName];
+    document.querySelectorAll('#tab-rechner .color-btn').forEach((b, i) => b.classList.toggle('active', i === legacyIdx));
 
     // Sync Doppeltür checkbox
     const dtCheckbox = document.getElementById('rechnerDoppeltuer');
@@ -1810,18 +3123,29 @@ function renderTable() {
     // v1.14.0: Aus Modell-Schnittliste rechnen wenn aktive Bestellung ein Maß mit modelId hat
     let modelMaterials = null;
     let modelName = '';
+    let modelColor = ''; // v1.19.22: Modell-Farbe für Header
     let measureVariants = {}; // v1.16.7 - Variants des aktiven Maßes für Cut-Conditions
+    let measureNames = {};     // v1.19.59 - gespeicherte Netz-/Plissee-Farbnamen (Hard-Delete-sicher)
     if (rechnerOrderId) {
         const o = orders.find(x => x.id === rechnerOrderId);
         if (o && o.measures && o.measures.length) {
-            // Finde das Maß zu den aktuellen Maßen (für Multi-Maß-Bestellungen)
-            const matchedMeasure = o.measures.find(mm =>
-                Math.abs((mm.breite || 0) - breite) < 0.5 &&
-                Math.abs((mm.hoehe || 0) - hoehe) < 0.5
-            ) || o.measures[0];
+            // v1.20.5 FIX: currentSlide indexiert summarySlides (pro STÜCK expandiert),
+            // NICHT o.measures (pro Maß). Bei einem Maß mit Stk>1 verschieben sich die Indizes
+            // → vorher wurde das falsche Maß genommen (Bodenprofil/Overrides vertauscht).
+            // Jetzt den echten Maß-Index aus der aktuellen Slide holen. Fallbacks unverändert.
+            const _slide = (typeof summarySlides !== 'undefined' && Array.isArray(summarySlides)) ? summarySlides[currentSlide] : null;
+            const mIdx = (_slide && typeof _slide._measureIndex === 'number') ? _slide._measureIndex : -1;
+            const matchedMeasure = ((mIdx >= 0 && mIdx < o.measures.length) ? o.measures[mIdx] : null)
+                || o.measures.find(mm =>
+                    Math.abs((mm.breite || 0) - breite) < 0.5 &&
+                    Math.abs((mm.hoehe || 0) - hoehe) < 0.5
+                )
+                || o.measures[0];
             const mid = matchedMeasure.modelId;
             // Variants übernehmen (für Cut-Conditions, v1.16.7)
             measureVariants = Object.assign({}, matchedMeasure.variants || {});
+            // v1.19.59: gespeicherte Farbnamen übernehmen (zeigt Farbe auch nach Hard-Delete)
+            measureNames = { netzFarbeName: matchedMeasure.netzFarbeName || '', plisseeFarbeName: matchedMeasure.plisseeFarbeName || '' };
             // Türart aus doppeltuer ableiten falls fehlt
             if (!measureVariants.tuerart) {
                 measureVariants.tuerart = matchedMeasure.doppeltuer ? 'doppel' : 'einzel';
@@ -1833,7 +3157,44 @@ function renderTable() {
                 if (model && model.sections && model.sections[0]) {
                     modelMaterials = model.sections[0].materials || [];
                     modelName = model.name || mid;
+                    modelColor = model.color || '';
+                    // v1.19.32: für nicht gesetzte Modell-Varianten den defaultOption übernehmen
+                    // (alte Bestellungen ohne netz_plissee bekommen 'netz' als Default → Netz-Material rendert)
+                    (model.variantIds || []).forEach(vid => {
+                        if (measureVariants[vid]) return;
+                        const v = (typeof getVariant === 'function') ? getVariant(vid) : null;
+                        if (v && v.defaultOption) measureVariants[vid] = v.defaultOption;
+                    });
                 }
+            } else if (o.isReparatur) {
+                // v1.19.34: Reparatur ohne Modell (legacy) → fallback auf Default-Modell für Schnittliste
+                const defModel = (typeof getDefaultModel === 'function') ? getDefaultModel() : null;
+                if (defModel && defModel.sections && defModel.sections[0]) {
+                    modelMaterials = defModel.sections[0].materials || [];
+                    modelName = (defModel.name || '') + ' (Default für Reparatur)';
+                    modelColor = defModel.color || '';
+                    (defModel.variantIds || []).forEach(vid => {
+                        if (measureVariants[vid]) return;
+                        const v = (typeof getVariant === 'function') ? getVariant(vid) : null;
+                        if (v && v.defaultOption) measureVariants[vid] = v.defaultOption;
+                    });
+                }
+            }
+        }
+    }
+
+    // v1.19.9: Standalone-Modus — User hat im Rechner-Tab manuell ein Modell
+    // (+ optional Varianten) gewählt, ohne eine Bestellung geladen zu haben.
+    if (!modelMaterials) {
+        const standaloneModelId = document.getElementById('rechnerModelId')?.value || '';
+        if (standaloneModelId) {
+            const model = getModel(standaloneModelId);
+            if (model && model.sections && model.sections[0]) {
+                modelMaterials = model.sections[0].materials || [];
+                modelName = model.name || standaloneModelId;
+                modelColor = model.color || '';
+                measureVariants = Object.assign({}, window._rechnerVariants || {});
+                measureVariants.tuerart = isDoppeltuer ? 'doppel' : 'einzel';
             }
         }
     }
@@ -1841,13 +3202,19 @@ function renderTable() {
     let html = '';
     if (modelMaterials) {
         // ═══ Modell-basierte Schnittliste (v1.14.0) ═══
-        // Cross-Material-Lookup für Tül-Adet: Profil-Breite-Abzug aus dem Modell
+        // Cross-Material-Lookup für Tül-Adet: Profil-Breite-Abzug aus dem Modell.
+        // v1.19.15: nutzt getEffectiveCutValues damit Overrides (z.B. Bodenprofil=Ja)
+        // auch für den Tül-Adet-enMass-Wert greifen.
         let enAbzug = 4.0;
         for (const mm of modelMaterials) {
             const matInfo = cachedMaterials.find(cm => cm.id === mm.materialId);
             if (matInfo && matInfo.type === 'stange' && mm.cuts?.length) {
                 const breiteCut = mm.cuts.find(c => c.basis === 'breite');
-                if (breiteCut) { enAbzug = breiteCut.abzug || 0; break; }
+                if (breiteCut) {
+                    const eff = getEffectiveCutValues(breiteCut, measureVariants);
+                    enAbzug = eff.abzug || 0;
+                    break;
+                }
             }
         }
 
@@ -1858,23 +3225,57 @@ function renderTable() {
             if (isDoppeltuer && matInfo.nurEinzeltuer) return;
             if (!isDoppeltuer && matInfo.nurDoppeltuer) return;
 
+            // v1.19.19: Material-Level Bedingung (z.B. "Bodenprofil nur wenn bodenprofil=ja")
+            if (mm.condition && !cutConditionMatches(mm.condition, measureVariants)) return;
+
             const cuts = mm.cuts || [];
             if (!cuts.length && matInfo.type !== 'flaeche' && !matInfo.perSqm && !matInfo.perOrder) return;
 
-            // Material-Header
-            html += `<tr><td colspan="5" style="font-size:12px;font-weight:700;color:var(--primary);padding:8px 0 2px;border-bottom:2px solid var(--primary-bg)">${escHtml(translateMaterial(matInfo.name))}</td></tr>`;
+            // v1.19.19: Wenn alle cuts conditional sind und keiner matched → Material komplett überspringen
+            if (cuts.length && matInfo.type !== 'flaeche' && !matInfo.perOrder) {
+                const visibleCuts = cuts.filter(c => !c.condition || cutConditionMatches(c.condition, measureVariants));
+                if (visibleCuts.length === 0) return;
+            }
+
+            // Material-Header — v1.19.59: Netz-/Plissee-Farbe als Badge anhängen (produktionswichtig)
+            let matColorBadge = '';
+            const _isPlisseeMat = /plissee/i.test(matInfo.name || '');
+            if (_isPlisseeMat && (measureVariants.plisseeFarbe || measureNames.plisseeFarbeName)) {
+                const pc = (measureVariants.plisseeFarbe && typeof getPlisseeColor === 'function') ? getPlisseeColor(measureVariants.plisseeFarbe) : null;
+                const nm = measureNames.plisseeFarbeName || pc?.name || '';
+                if (nm) matColorBadge = ` <span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700;background:${pc?.bg || '#888'};color:${pc?.text || '#fff'};vertical-align:middle;margin-left:6px">${escHtml(nm)}</span>`;
+            } else if (matInfo.type === 'netz' && (measureVariants.netzFarbe || measureNames.netzFarbeName)) {
+                const nc = (measureVariants.netzFarbe && typeof getNetzColor === 'function') ? getNetzColor(measureVariants.netzFarbe) : null;
+                const nm = measureNames.netzFarbeName || nc?.name || '';
+                if (nm) matColorBadge = ` <span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700;background:${nc?.bg || '#888'};color:${nc?.text || '#fff'};vertical-align:middle;margin-left:6px">${escHtml(nm)}</span>`;
+            }
+            html += `<tr><td colspan="5" style="font-size:12px;font-weight:700;color:var(--primary);padding:8px 0 2px;border-bottom:2px solid var(--primary-bg)">${escHtml(translateMaterial(matInfo.name))}${matColorBadge}</td></tr>`;
 
             if (matInfo.type === 'netz' && cuts.length) {
                 const enMass = breite - enAbzug;
-                // Tül-Adet bei DT halbieren (2 Flügel je halbe Breite), aufrunden (v1.16.0)
-                const stueck = isDoppeltuer ? 2 : 1;
-                const tuelAdet = Math.ceil(isDoppeltuer ? (enMass / 2 / 2) : (enMass / 2));
-                const abzugLabel = isDoppeltuer ? `−${enAbzug} ÷ 2 ÷ 2` : `−${enAbzug} ÷ 2`;
-                html += `<tr><td>${translateMaterial('Tül Adet')}</td><td><span class="bestell-val">${breite.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">${abzugLabel}</td><td>${stueck}</td><td><span class="mass-value">${tuelAdet}</span></td></tr>`;
+                // Tül-Adet bei DT halbieren (2 Flügel je halbe Breite), aufrunden (v1.16.0).
+                // v1.20.9: Kombi bedeckt die VOLLE Breite (Netz+Plissee je eine Bahn) → NICHT halbieren.
+                const splitDT = isDoppeltuer && measureVariants.netz_plissee !== 'kombi';
+                const stueck = splitDT ? 2 : 1;
+                const tuelAdet = Math.ceil(splitDT ? (enMass / 2 / 2) : (enMass / 2));
+                const abzugLabel = splitDT ? `−${enAbzug} ÷ 2 ÷ 2` : `−${enAbzug} ÷ 2`;
+                // v1.19.29: Label je nach Material — Plissee-Stoffe bekommen "Plissee Faltenanzahl"
+                const isPlisseeMat = /plissee/i.test(matInfo.name || '');
+                const tuelAdetLabel = isPlisseeMat ? 'Plissee Faltenanzahl' : translateMaterial('Tül Adet');
+                html += `<tr><td>${escHtml(tuelAdetLabel)}</td><td><span class="bestell-val">${breite.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">${abzugLabel}</td><td>${stueck}</td><td><span class="mass-value">${tuelAdet}</span></td></tr>`;
                 const tuelCut = cuts.find(c => c.basis === 'hoehe');
                 if (tuelCut) {
-                    const tuelLen = hoehe - (tuelCut.abzug || 0);
-                    html += `<tr><td>${escHtml(translateMaterial(tuelCut.label))}</td><td><span class="bestell-val">${hoehe.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${tuelCut.abzug}</td><td>1</td><td><span class="mass-value">${tuelLen.toFixed(1)}</span></td></tr>`;
+                    // v1.19.15: getEffectiveCutValues + ⚡-Marker auch für Netz-Höhencut,
+                    // damit Overrides (z.B. Bodenprofil=Ja → kleinerer Abzug) korrekt greifen.
+                    if (tuelCut.condition && !cutConditionMatches(tuelCut.condition, measureVariants)) {
+                        // Cut komplett ausgefiltert — nichts rendern
+                    } else {
+                        const effT = getEffectiveCutValues(tuelCut, measureVariants);
+                        const tuelLen = hoehe - (effT.abzug || 0);
+                        const hasActiveOvT = (tuelCut.overrides || []).some(ov => cutConditionMatches(ov.when, measureVariants));
+                        const ovMarkerT = hasActiveOvT ? ' <span style="font-size:9px;color:var(--amber);font-weight:700" title="Override aktiv">⚡</span>' : '';
+                        html += `<tr><td>${escHtml(translateMaterial(tuelCut.label))}${ovMarkerT}</td><td><span class="bestell-val">${hoehe.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${effT.abzug}</td><td>1</td><td><span class="mass-value">${tuelLen.toFixed(1)}</span></td></tr>`;
+                    }
                 }
             } else if (matInfo.type === 'flaeche') {
                 const sqm = (breite/100) * (hoehe/100);
@@ -1907,8 +3308,21 @@ function renderTable() {
             }
         });
 
-        // Modell-Hinweis oben einblenden
-        const modelHint = `<tr><td colspan="5" style="padding:4px 6px;background:var(--primary-bg);font-size:11px;color:var(--primary);font-weight:600;text-align:center">Modell: ${escHtml(modelName)}</td></tr>`;
+        // v1.19.22: Prominenter Modell-Header mit individueller Modell-Farbe
+        // (model.color aus Stammdaten). Hilft bei Multi-Modell-Bestellungen
+        // auf den ersten Blick zu sehen welches Modell gerendert wird.
+        // Fallback wenn keine Farbe gesetzt: Default-Primärfarbe.
+        const _mcRaw = (modelColor && /^#[0-9a-fA-F]{6}$/.test(modelColor)) ? modelColor : '';
+        const _mcBg = _mcRaw || '#534AB7';
+        const _mcText = _mcRaw
+            ? (_isDarkHex(_mcRaw) ? '#ffffff' : '#1a1a1a')
+            : '#ffffff';
+        const modelHint = `<tr><td colspan="5" style="padding:10px 12px;background:${_mcBg};color:${_mcText};font-size:14px;font-weight:700;letter-spacing:0.02em;border-left:4px solid rgba(0,0,0,0.18)">
+            <span style="display:inline-flex;align-items:center;gap:8px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                ${t('Modell:')} ${escHtml(modelName)}
+            </span>
+        </td></tr>`;
 
         // Falls Schnittliste leer (Modell wurde noch nicht gepflegt)
         if (!html) {
@@ -1921,83 +3335,14 @@ function renderTable() {
         return;
     }
 
-    // ═══ Fallback: alte Material-basierte Logik (kein Modell verfügbar) ═══
-    const rechnerMats = cachedMaterials.filter(m => {
-        if (!m.active) return false;
-        if (!(m.showInRechner || m.rechnerFields?.length)) return false;
-        if (isDoppeltuer && m.nurEinzeltuer) return false;
-        if (!isDoppeltuer && m.nurDoppeltuer) return false;
-        return true;
-    });
-
-    if (rechnerMats.length) {
-        rechnerMats.forEach(mat => {
-            const matCuts = (mat.cuts && mat.cuts.length) ? mat.cuts
-                : (mat.rechnerFields || []).map(fn => {
-                    const ab = abzuege.find(a => a.name === fn);
-                    return ab ? { label: ab.name, abzug: ab.abzug, stueck: ab.stueck, basis: ab.basis, doppeltuerFaktor: 1 } : null;
-                }).filter(Boolean);
-
-            if (!matCuts.length && mat.type !== 'flaeche' && !mat.perSqm && !mat.perOrder) return;
-
-            html += `<tr><td colspan="5" style="font-size:12px;font-weight:700;color:var(--primary);padding:8px 0 2px;border-bottom:2px solid var(--primary-bg)">${escHtml(translateMaterial(mat.name))}</td></tr>`;
-
-            if (mat.type === 'netz' && matCuts.length) {
-                let enAbzug = 4.0;
-                for (const rm of rechnerMats) {
-                    if (rm.type === 'stange' && rm.cuts?.length) {
-                        const breiteCut = rm.cuts.find(c => c.basis === 'breite');
-                        if (breiteCut) { enAbzug = breiteCut.abzug || 0; break; }
-                    }
-                }
-                const enMass = breite - enAbzug;
-                // Tül-Adet bei DT halbieren (2 Flügel je halbe Breite), aufrunden (v1.16.0)
-                const stueck = isDoppeltuer ? 2 : 1;
-                const tuelAdet = Math.ceil(isDoppeltuer ? (enMass / 2 / 2) : (enMass / 2));
-                const abzugLabel = isDoppeltuer ? `−${enAbzug} ÷ 2 ÷ 2` : `−${enAbzug} ÷ 2`;
-                html += `<tr><td>${translateMaterial('Tül Adet')}</td><td><span class="bestell-val">${breite.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">${abzugLabel}</td><td>${stueck}</td><td><span class="mass-value">${tuelAdet}</span></td></tr>`;
-
-                const tuelCut = matCuts.find(c => c.basis === 'hoehe');
-                if (tuelCut) {
-                    const tuelLen = hoehe - (tuelCut.abzug || 0);
-                    html += `<tr><td>${escHtml(translateMaterial(tuelCut.label))}</td><td><span class="bestell-val">${hoehe.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${tuelCut.abzug}</td><td>1</td><td><span class="mass-value">${tuelLen.toFixed(1)}</span></td></tr>`;
-                }
-            } else if (mat.type === 'flaeche') {
-                const sqm = (breite/100) * (hoehe/100);
-                const perSqm = isDoppeltuer && mat.dtPerSqm ? mat.dtPerSqm : (mat.perSqm||0);
-                const total = sqm * perSqm;
-                html += `<tr><td>m²</td><td><span class="bestell-val">${sqm.toFixed(2)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">× ${perSqm}</td><td>1</td><td><span class="mass-value">${total.toFixed(1)} m</span></td></tr>`;
-            } else if (mat.perOrder) {
-                html += `<tr><td>Pro Bestellung</td><td></td><td></td><td>${mat.perOrder}</td><td><span class="mass-value">${mat.perOrder} ${mat.unit||'Stk'}</span></td></tr>`;
-            } else {
-                matCuts.forEach(cut => {
-                    if (cut.basis === 'tuel_adet') return;
-                    const basis = cut.basis === 'breite' ? breite : hoehe;
-                    const mass = basis - (cut.abzug || 0);
-                    const baseStueck = cut.stueck || 1;
-                    const dtF = cut.doppeltuerFaktor || 1;
-                    let stueckDisplay = String(baseStueck);
-                    if (isDoppeltuer && dtF > 1) {
-                        const dtStueck = baseStueck * dtF;
-                        stueckDisplay = `<span style="color:var(--primary);font-weight:700">${dtStueck}</span> <span style="font-size:10px;color:var(--text-muted)">(${baseStueck}×${dtF})</span>`;
-                    }
-                    html += `<tr><td>${escHtml(translateMaterial(cut.label))}</td><td><span class="bestell-val">${basis.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${cut.abzug}</td><td>${stueckDisplay}</td><td><span class="mass-value">${mass.toFixed(1)}</span></td></tr>`;
-                });
-            }
-        });
-    } else {
-        // Fallback to old abzuege system
-        const enIdx=abzuege.findIndex(m=>m.name==='Profil En');
-        const enMass = enIdx>=0 ? breite-abzuege[enIdx].abzug : 0;
-        const tuelAdet = enMass/2;
-        abzuege.forEach((m,i)=>{
-            if(m.basis==='tuel_adet'){ html+=`<tr><td>${escHtml(translateMaterial(m.name))}</td><td><span class="bestell-val">${enMass.toFixed(1)}</span></td><td style="text-align:center;color:var(--text-muted);font-size:12px">÷ 2</td><td>1</td><td><span class="mass-value">${tuelAdet.toFixed(1)}</span></td></tr>`; return; }
-            const stueck = m.stueck;
-            const basis=m.basis==='breite'?breite:hoehe, mass=basis-m.abzug;
-            html+=`<tr><td>${escHtml(translateMaterial(m.name))}</td><td><span class="bestell-val">${basis.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${m.abzug}</td><td>${stueck}</td><td><span class="mass-value">${mass.toFixed(1)}</span></td></tr>`;
-        });
-    }
-    document.getElementById('matTable').innerHTML=html;
+    // v1.19.10: Material-eigene Schnittliste wurde entfernt. Ohne ein gewähltes
+    // Modell (weder im Rechner-Dropdown noch über eine geladene Bestellung) kann
+    // die Schnittliste nicht berechnet werden — wir zeigen einen klaren Hinweis.
+    document.getElementById('matTable').innerHTML =
+        `<tr><td colspan="5" style="padding:20px 12px;text-align:center;font-size:13px;color:var(--text-muted);background:#fef3c7;border-left:3px solid #d97706">
+            <strong>Kein Modell gewählt.</strong><br>
+            <span style="font-size:11px">Wähle oben im Modell-Dropdown ein Modell aus, um die Schnittliste zu sehen.</span>
+        </td></tr>`;
 }
 
 function renderAbstand() {
@@ -2022,13 +3367,30 @@ function renderAll() {
     // Check B-Ware in Rechner
     const b = parseFloat(document.getElementById('breite').value) || 0;
     const h = parseFloat(document.getElementById('hoehe').value) || 0;
-    if (b && h) checkBWare(b, h, selectedColor);
+    // v1.19.42: aktuelles Rechner-Modell mit übergeben, damit B-Ware nach Modell gefiltert wird
+    const _rechnerModelId = document.getElementById('rechnerModelId')?.value || '';
+    if (b && h) checkBWare(b, h, selectedColor, _rechnerModelId);
 }
 
 // ═══ ROLE MANAGEMENT ═══
 function esc(s){return(s||'').replace(/'/g,"\\'").replace(/\n/g,' ');}
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-function farbeColor(f){return f==='Antrazit'?'#4a4a4a':f==='Weiß'?'#888':f==='Braun'?'#8B4513':'var(--primary)';}
+// v1.19.51: Farb-Badge nimmt echte Farbe aus cachedColors (Stammdaten) statt hardcoded.
+function farbeColor(f){
+    if (typeof cachedColors !== 'undefined' && Array.isArray(cachedColors)) {
+        const c = cachedColors.find(x => x && x.name === f);
+        if (c && c.bg) return c.bg;
+    }
+    return f==='Antrazit'?'#4a4a4a':f==='Weiß'?'#888':f==='Braun'?'#8B4513':'var(--primary)';
+}
+function farbeTextColor(f){
+    if (typeof cachedColors !== 'undefined' && Array.isArray(cachedColors)) {
+        const c = cachedColors.find(x => x && x.name === f);
+        if (c && c.text) return c.text;
+    }
+    // Fallback: bei hellem bg (Weiß) dunkler Text, sonst weiß
+    return f==='Weiß' ? '#333' : '#fff';
+}
 
 // Normalize phone: handles 0660..., 0043..., +43..., with/without spaces
 function normalizePhone(vorwahl, nummer) {
@@ -2064,9 +3426,26 @@ function autoFormatPhone(input, vorwahlId) {
 }
 function isSuperAdmin() { return currentUser && currentUser.email === SUPERADMIN_EMAIL; }
 function isAdmin() { return currentUserRole === 'admin' || currentUserRole === 'superadmin' || isSuperAdmin(); }
-function hasPerm(perm) { return isAdmin() || currentUserPerms[perm] === true; }
+// v1.19.14: Default-Allow-Set — Permissions die für bestehende Mitarbeiter
+// standardmäßig an sind, auch wenn der Schlüssel nicht im Firestore-Doc steht.
+// Bei diesen Permissions ist nur `false` ein bewusstes „aus" — alles andere
+// (undefined, null, true) zählt als erlaubt. So fliegt z.B. „prices_view" nicht
+// schlagartig bei allen bestehenden Mitarbeitern aus, wenn die Permission neu
+// eingeführt wird.
+const DEFAULT_ALLOW_PERMISSIONS = new Set(['prices_view', 'transport_view', 'move_to_transport']);
+function hasPerm(perm) {
+    if (isAdmin()) return true;
+    if (DEFAULT_ALLOW_PERMISSIONS.has(perm)) return currentUserPerms[perm] !== false;
+    return currentUserPerms[perm] === true;
+}
 
 function applyRoleRestrictions() {
+    // v1.19.14: Body-Klasse 'no-prices' wenn User keine Preis-Sicht hat.
+    // Alle Preis-Elemente sind in style.css unter ".no-prices .price-protected"
+    // ausgeblendet, sodass eine zentrale Stelle alle €-Anzeigen versteckt.
+    const canSeePrices = isAdmin() || isSuperAdmin() || hasPerm('prices_view');
+    document.body.classList.toggle('no-prices', !canSeePrices);
+
     // Admin sees everything
     if (isAdmin()) {
         document.querySelectorAll('.tab-item').forEach(t => t.style.display = '');
@@ -2076,6 +3455,11 @@ function applyRoleRestrictions() {
         if (sqmEl) { sqmEl.disabled = false; sqmEl.style.opacity = '1'; }
         const colBtn = document.querySelector('[onclick="manageColumns()"]');
         if (colBtn) { const row = colBtn.closest('.setting-row'); if (row) row.style.display = 'flex'; }
+        // Buchhaltungs-Sektion bei Admin sichtbar
+        const buSec = document.getElementById('menu-buchhaltung-section');
+        const buItem = document.getElementById('menu-buchhaltung-item');
+        if (buSec) buSec.style.display = '';
+        if (buItem) buItem.style.display = '';
         return;
     }
 
@@ -2087,12 +3471,23 @@ function applyRoleRestrictions() {
         'inventur': 'lager_inventur',
         'materialien': 'lager_view',
         'dashboard': 'dashboard_view',
-        'settings': 'settings_view'
+        'settings': 'settings_view',
+        'buchhaltung': 'buchhaltung_view'
     };
+    // v1.19.14: Buchhaltung und Auswertung beide brauchen prices_view (sind beide
+    // €-zentriert) — ohne diese Sicht macht der Tab keinen Sinn.
+    const canSeePricesM = hasPerm('prices_view');
     Object.entries(menuPerms).forEach(([tab, perm]) => {
         const el = document.querySelector('.menu-item[data-tab="' + tab + '"]');
-        if (el) el.style.display = hasPerm(perm) ? '' : 'none';
+        if (!el) return;
+        let allowed = hasPerm(perm);
+        if (tab === 'buchhaltung' || tab === 'dashboard') allowed = allowed && canSeePricesM;
+        el.style.display = allowed ? '' : 'none';
     });
+
+    // Buchhaltungs-Sektion (Sektion-Header + Item) komplett ausblenden bei fehlender Berechtigung
+    const buSec = document.getElementById('menu-buchhaltung-section');
+    if (buSec) buSec.style.display = (hasPerm('buchhaltung_view') && canSeePricesM) ? '' : 'none';
     const settingsTab = document.querySelector('[data-tab="settings"]');
     if (settingsTab) settingsTab.style.display = hasPerm('settings_view') ? '' : 'none';
 
@@ -2137,6 +3532,27 @@ function applyRoleRestrictions() {
 }
 
 let totalOverrideValue = null;
+
+// v1.19.16: Bei Reparaturen ändert sich der Pauschalpreis direkt — wir nutzen
+// dieselbe totalOverrideValue-Mechanik, sodass saveOrderEdit den neuen Preis
+// korrekt persistiert. 0 € ist explizit erlaubt.
+function onReparaturPriceChange(orderId, value) {
+    const v = parseFloat(value);
+    totalOverrideValue = isNaN(v) ? 0 : v;
+    const o = orders.find(x => x.id === orderId);
+    if (!o) return;
+    const payments = o.payments || [];
+    const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
+    const offen = totalOverrideValue - totalPaid;
+    // Summary live aktualisieren
+    if (typeof calcEditPrice === 'function') {
+        // Wir manipulieren das Order-Objekt temporär damit das Re-Render greift.
+        const orig = o.totalPrice;
+        o.totalPrice = totalOverrideValue;
+        calcEditPrice(orderId);
+        o.totalPrice = orig; // sofort zurück — Persistierung erfolgt erst beim Speichern
+    }
+}
 
 function onTotalOverride(orderId) {
     const input = document.getElementById('editTotalOverride');
@@ -2336,71 +3752,138 @@ function initBackupCard() {
 // ═══ PUSH NOTIFICATIONS ═══
 let pushEnabled = false;
 
+// v1.20.0: Echtes FCM-Server-Push. Token wird beim Aktivieren + bei jedem Login
+// (wenn schon erlaubt) im Member-Doc gespeichert; die Cloud Function schickt das Push.
+let _currentFcmToken = null;
+function pushLocallyDisabled() {
+    try { return localStorage.getItem('fg_push_disabled') === '1'; } catch (_) { return false; }
+}
+
 async function initPushNotifications() {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
-    if (Notification.permission === 'granted') {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) { updatePushButton(); return; }
+    // Auf diesem Gerät bewusst deaktiviert → nicht automatisch wieder anmelden.
+    if (Notification.permission === 'granted' && !pushLocallyDisabled()) {
         pushEnabled = true;
+        // Bereits erlaubt → Token sicherstellen. Beim allerersten Aufruf (Script-Load)
+        // ist currentUser evtl. noch null → wird nach dem Login erneut aufgerufen (03-auth.js).
+        if (currentUser) registerFcmToken();
+    }
+    updatePushButton();
+}
+
+// Umschalter: aktiv → abmelden, sonst → aktivieren
+async function togglePush() {
+    if (Notification.permission === 'granted' && pushEnabled && !pushLocallyDisabled()) {
+        await deactivatePush();
+    } else {
+        await requestPushPermission();
+    }
+}
+
+// Dieses Gerät vom Push abmelden (Token entfernen). Browser-Berechtigung bleibt,
+// aber es kommen keine Benachrichtigungen mehr. Jederzeit wieder aktivierbar.
+async function deactivatePush() {
+    try { localStorage.setItem('fg_push_disabled', '1'); } catch (_) {}
+    pushEnabled = false;
+    try {
+        if (_currentFcmToken && currentUser) {
+            await db.collection('members').doc(currentUser.uid)
+                .update({ fcmTokens: firebase.firestore.FieldValue.arrayRemove(_currentFcmToken) }).catch(() => {});
+        }
+        const m = initMessaging();
+        if (m && m.deleteToken) { await m.deleteToken().catch(() => {}); }
+    } catch (e) { console.warn('[FCM] deactivate:', e); }
+    _currentFcmToken = null;
+    updatePushButton();
+    showToast('Benachrichtigungen deaktiviert.', 'success');
+}
+
+// Button-Status „Benachrichtigungen" in den Einstellungen aktualisieren
+function updatePushButton() {
+    const btn = document.getElementById('pushToggleBtn');
+    if (!btn) return;
+    if (typeof Notification === 'undefined') { btn.textContent = 'Nicht verfügbar'; btn.disabled = true; return; }
+    if (Notification.permission === 'granted' && pushEnabled && !pushLocallyDisabled()) {
+        btn.textContent = '✓ Aktiviert';
+        btn.style.background = '#dcfce7'; btn.style.color = '#15803d'; btn.style.borderColor = '#bbf7d0';
+        btn.title = 'Push auf diesem Gerät aktiv — tippen zum Deaktivieren';
+    } else if (Notification.permission === 'denied') {
+        btn.textContent = 'Blockiert';
+        btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+        btn.title = 'In den Browser-Einstellungen Benachrichtigungen für diese Seite erlauben';
+    } else {
+        btn.textContent = 'Aktivieren';
+        btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+        btn.title = '';
     }
 }
 
 async function requestPushPermission() {
     if (!('Notification' in window)) {
-        showToast('Dieser Browser unterstützt keine Benachrichtigungen.', 'warning');
-        return;
+        showToast('Dieser Browser unterstützt keine Benachrichtigungen.', 'warning'); return;
     }
+    if (!initMessaging()) {
+        showToast('Push wird hier nicht unterstützt. Bitte Chrome (Android) oder die installierte App (iPhone: „Zum Home-Bildschirm") nutzen.', 'warning'); return;
+    }
+    try { localStorage.removeItem('fg_push_disabled'); } catch (_) {} // Wieder-Aktivieren erlaubt Auto-Anmeldung
     const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-        pushEnabled = true;
-        showToast('Benachrichtigungen aktiviert!', 'success');
-        // Save preference
-        if (currentUser) {
-            db.collection('members').doc(currentUser.uid).update({
+    if (permission !== 'granted') { showToast('Benachrichtigungen wurden abgelehnt.', 'warning'); return; }
+    pushEnabled = true;
+    const token = await registerFcmToken();
+    updatePushButton();
+    showToast(token ? 'Benachrichtigungen aktiviert!' : 'Aktiviert — bitte App einmal neu laden, dann ist Push aktiv.', token ? 'success' : 'warning');
+}
+
+// FCM-Token holen + im Member-Doc speichern (mehrere Geräte pro Mitarbeiter möglich)
+async function registerFcmToken() {
+    const m = initMessaging();
+    if (!m || !currentUser) return null;
+    try {
+        const token = await m.getToken({ vapidKey: FCM_VAPID_KEY });
+        if (token) {
+            await db.collection('members').doc(currentUser.uid).set({
+                fcmTokens: firebase.firestore.FieldValue.arrayUnion(token),
                 pushEnabled: true
-            }).catch(console.error);
+            }, { merge: true });
+            _currentFcmToken = token;
+            setupForegroundMessages(m);
+            pushEnabled = true;
+            updatePushButton();
+            return token;
         }
-    } else {
-        showToast('Benachrichtigungen wurden abgelehnt.', 'warning');
-    }
+    } catch (e) { console.warn('[FCM] getToken fehlgeschlagen:', e); }
+    return null;
+}
+
+let _fcmForegroundSet = false;
+function setupForegroundMessages(m) {
+    if (_fcmForegroundSet || !m) return;
+    _fcmForegroundSet = true;
+    try {
+        m.onMessage(payload => {
+            const n = payload.notification || {};
+            const data = payload.data || {};
+            sendLocalNotification(n.title || data.title || 'Neue Bestellung!', n.body || data.body || '');
+        });
+    } catch (e) { console.warn('[FCM] onMessage:', e); }
 }
 
 function sendLocalNotification(title, body) {
-    if (!pushEnabled || Notification.permission !== 'granted') return;
+    if (Notification.permission !== 'granted') return;
     try {
-        new Notification(title, {
-            body: body,
-            icon: '/icons/icon-192.png',
-            badge: '/icons/icon-192.png',
-            vibrate: [200, 100, 200]
-        });
-    } catch (e) {
-        // Fallback for mobile: use service worker
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.ready.then(reg => {
-                reg.showNotification(title, {
-                    body: body,
-                    icon: '/icons/icon-192.png',
-                    vibrate: [200, 100, 200]
-                });
-            });
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(reg => reg.showNotification(title, {
+                body: body, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', vibrate: [200, 100, 200]
+            })).catch(() => { try { new Notification(title, { body: body, icon: '/icons/icon-192.png' }); } catch(_) {} });
+        } else {
+            new Notification(title, { body: body, icon: '/icons/icon-192.png' });
         }
-    }
+    } catch (e) { /* ignore */ }
 }
 
-// Notify on new orders (listen for additions)
-let lastOrderCount = 0;
-function checkNewOrders() {
-    if (!pushEnabled) return;
-    const currentCount = orders.filter(o => o.column === 'Bestellung').length;
-    if (lastOrderCount > 0 && currentCount > lastOrderCount) {
-        const newest = orders.filter(o => o.column === 'Bestellung')[0];
-        if (newest) {
-            sendLocalNotification('Neue Bestellung!',
-                `${newest.vorname || ''} ${newest.nachname || ''} – ${(newest.measures || []).length} Artikel`
-            );
-        }
-    }
-    lastOrderCount = currentCount;
-}
+// v1.20.0: alte Count-basierte lokale Notification entfernt — FCM-Server-Push übernimmt.
+// Funktion bleibt als No-Op, da subscribeOrders (07-board.js) sie noch aufruft.
+function checkNewOrders() { /* deaktiviert — siehe FCM-Push */ }
 
 // v1.18.9-phase5c: subscribeOrders ist jetzt in 07-board.js definiert und
 // enthält direkt die Push-Notification-Logik (checkNewOrders). Der frühere
@@ -2466,6 +3949,8 @@ window.addEventListener('pageshow', () => {
 <script src="js/08-order.js"></script>
 <script src="js/09-prodstats.js"></script>
 <script src="js/10-search.js"></script>
+<script src="js/11-buchhaltung.js"></script>
+<script src="js/12-mat-forecast.js"></script>
 
 <!-- v1.18.15: Suche-Overlay (separates Modal über dem Board) -->
 <div id="searchOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:20px 10px;backdrop-filter:blur(2px)" onclick="if(event.target===this)closeSearchOverlay()">

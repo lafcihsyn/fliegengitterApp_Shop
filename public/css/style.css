@@ -450,10 +450,14 @@
         .add-payment-btn { padding: 8px 14px; border: none; border-radius: 8px; background: var(--green); color: white; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .add-payment-btn:active { opacity: 0.8; }
         .price-sqm-input {
-            width: 60px; padding: 3px 5px; font-size: 12px; font-weight: 600; text-align: center;
+            /* v1.19.47: breiter (war 60px, zu eng für 3-stellige Preise) + Spinner aus */
+            width: 90px; padding: 3px 5px; font-size: 12px; font-weight: 600; text-align: center;
             border: 1px solid var(--border); border-radius: 5px; font-family: inherit;
             background: var(--border-light); color: var(--primary);
+            -moz-appearance: textfield; appearance: textfield;
         }
+        .price-sqm-input::-webkit-outer-spin-button,
+        .price-sqm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .price-sqm-input:focus { outline: none; border-color: var(--primary); background: var(--primary-bg); }
         .price-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
         .price-row-label { color: var(--text-secondary); }
@@ -673,3 +677,10 @@
     max-width: 280px;
     margin: 0 auto;
 }
+
+/* v1.19.14: Preis-Ausblendung für Mitarbeiter ohne 'prices_view'-Permission.
+   Body bekommt Klasse 'no-prices' in applyRoleRestrictions(). Alle Preis-
+   tragenden Elemente bekommen Klasse 'price-protected' im Render-Code. */
+body.no-prices .price-protected,
+body.no-prices [data-price] { display: none !important; }
+

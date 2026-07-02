@@ -106,8 +106,10 @@ function renderSearchResults(term) {
             const bem = m.bemerkung || '';
             return dims + ' ' + bem;
         }).join(' ');
+        // v1.19.50: o.farbe abgeschafft, aber für Suche in alten Bestellungen kompatibel
+        const measureColors = (o.measures || []).map(m => m.farbe).filter(Boolean).join(' ');
         const haystack = [
-            o.vorname, o.nachname, o.telefon, o.farbe, o.bemerkung,
+            o.vorname, o.nachname, o.telefon, o.farbe, measureColors, o.bemerkung,
             o.orderNumber, o.email, measureStr
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(t);
@@ -137,6 +139,7 @@ function renderSearchResults(term) {
     const colColors = {
         'Bestellung':    {bg:'#ede9fe', color:'#6d28d9'},
         'In Produktion': {bg:'#fef3c7', color:'#b45309'},
+        'Transport':     {bg:'#cffafe', color:'#0e7490'},
         'Abholbereit':   {bg:'#d1fae5', color:'#047857'},
         'Abgeholt':      {bg:'#dbeafe', color:'#1e40af'},
         'Reparatur':     {bg:'#dbeafe', color:'#1e40af'},
@@ -155,7 +158,7 @@ function renderSearchResults(term) {
             const stk = (m.stueck && m.stueck > 1) ? ' ×' + m.stueck : '';
             return m.breite + '×' + m.hoehe + stk;
         }).join(', ');
-        const colors = [...new Set((o.measures || []).map(m => m.farbe).filter(Boolean))].join(', ') || o.farbe || '';
+        const colors = [...new Set((o.measures || []).map(m => m.farbe).filter(Boolean))].join(', ');
         const orderNr = o.orderNumber ? `<span style="font-size:11px;color:var(--text-muted);font-weight:600;margin-right:4px">${escHtml(o.orderNumber)}</span>` : '';
         const repIcon = o.isReparatur ? '<span title="Reparatur" style="margin-right:4px">🔧</span>' : '';
         const onlineIcon = o.source === 'online' ? '<span title="Online-Bestellung" style="margin-right:4px">📦</span>' : '';

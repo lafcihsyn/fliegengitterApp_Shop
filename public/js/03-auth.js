@@ -45,6 +45,7 @@ const PERM_GROUPS = {
     'Verschieben': {
         'move_to_warteliste': '→ Warteliste',
         'move_to_produktion': '→ In Produktion',
+        'move_to_transport': '→ Transport (Inegöl-Lieferung)',
         'move_to_abholbereit': '→ Abholbereit',
         'move_to_abgeholt': '→ Abgeholt',
         'bware_move': '→ B-Ware'
@@ -63,10 +64,17 @@ const PERM_GROUPS = {
         'rechner_use': 'Schnittliste verwenden',
         'rechner_print': 'Etiketten drucken',
         'settings_view': 'Einstellungen anzeigen',
+        'prices_view': 'Preise sehen (Beträge, Summen, €-Werte)',
         'price_edit': 'm²-Preis ändern',
         'members_invite': 'Mitarbeiter einladen',
         'members_roles': 'Rollen verwalten',
-        'columns_manage': 'Spalten verwalten'
+        'mitarbeiter_leistung_view': 'Mitarbeiter-Leistung sehen (Produktions-Drill-down)',
+        'columns_manage': 'Spalten verwalten',
+        'transport_view': 'Transport-Spalte sehen'
+    },
+    'Buchhaltung': {
+        'buchhaltung_view':   'Online-Zahlungen einsehen',
+        'buchhaltung_export': 'Zahlungen als CSV/PDF exportieren'
     }
 };
 const ALL_PERMISSIONS = {};
@@ -78,6 +86,9 @@ const DEFAULT_PERMS = {
     mitarbeiter: {
         orders_create: true, orders_edit: true, orders_delete: false,
         move_to_warteliste: true, move_to_produktion: true, move_to_abholbereit: true, move_to_abgeholt: true, orders_payment: true, orders_pdf: true,
+        // Transport-Rechte: Default AN für alle (auch via DEFAULT_ALLOW_PERMISSIONS für bestehende Mitarbeiter).
+        // Owner hakt in „Rollen verwalten" gezielt ab, wer NICHT sehen/verschieben darf.
+        move_to_transport: true, transport_view: true,
         orders_rechner: false,
         reparatur_handle: false,
         customer_notify: false,
@@ -86,8 +97,12 @@ const DEFAULT_PERMS = {
         lager_view: false, lager_eingang: false, lager_inventur: false,
         dashboard_view: false,
         rechner_use: true, rechner_print: true,
+        // v1.19.14: prices_view standardmäßig true → kein Bruch für bestehende Mitarbeiter
+        // Admin kann gezielt abhaken um Preise für einzelne Mitarbeiter zu verstecken.
+        prices_view: true,
         settings_view: false, price_edit: false, members_invite: false,
-        members_roles: false, columns_manage: false
+        members_roles: false, mitarbeiter_leistung_view: false, columns_manage: false,
+        buchhaltung_view: false, buchhaltung_export: false
     }
 };
 
@@ -115,6 +130,17 @@ auth.onAuthStateChanged(async user => {
         // Load user role and permissions
         try {
             const memberDoc = await db.collection('members').doc(user.uid).get();
+            // v1.19.61: Deaktivierte Mitarbeiter aussperren (Zugang gesperrt, Historie bleibt).
+            // Superadmin kann nie ausgesperrt werden. Nur explizit active:false blockiert —
+            // neue/Bestands-Mitarbeiter ohne Flag bleiben erlaubt.
+            if (memberDoc.exists && memberDoc.data().active === false && user.email !== SUPERADMIN_EMAIL) {
+                await auth.signOut();
+                const le = document.getElementById('loginError');
+                if (le) le.textContent = 'Dein Zugang wurde deaktiviert. Bitte wende dich an die Geschäftsleitung.';
+                document.getElementById('loginScreen').style.display = 'flex';
+                document.getElementById('appScreen').classList.remove('active');
+                return;
+            }
             if (memberDoc.exists) {
                 const data = memberDoc.data();
                 currentUserRole = data.role || 'mitarbeiter';
@@ -176,7 +202,9 @@ auth.onAuthStateChanged(async user => {
         // v1.18.0: i18n-Observer starten (übersetzt alles automatisch wenn currentLanguage='tr')
         startI18nObserver();
         // Backup system
-        setTimeout(() => { initBackupCard(); checkBackupReminder(); loadFilialen(); loadColors(); loadPlisseeColors(); loadVariants(); loadModels(); loadCompanyData(); }, 2000);
+        setTimeout(() => { initBackupCard(); checkBackupReminder(); loadFilialen(); loadColors(); loadPlisseeColors(); loadNetzColors(); loadNetzBreiten(); loadMaterialDimensions(); loadVariants(); loadModels(); loadCompanyData(); }, 2000);
+        // v1.20.0: FCM-Token nach Login sicherstellen (falls Push schon erlaubt ist)
+        if (typeof initPushNotifications === 'function') { try { initPushNotifications(); } catch(e) { console.warn('initPushNotifications:', e); } }
     } else {
         document.getElementById('loginScreen').style.display = 'flex';
         document.getElementById('appScreen').classList.remove('active');

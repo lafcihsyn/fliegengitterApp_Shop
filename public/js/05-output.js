@@ -32,7 +32,8 @@ function generateEtikett() {
     // kunde/telefon Inputs gibt's seit v1.15.0-p7 nicht mehr — Daten aus aktueller Slide nehmen
     const currentS = summarySlides && summarySlides[currentSlide];
     const k = (document.getElementById('kunde')?.value) || (currentS && currentS.kunde) || '';
-    const t = (document.getElementById('telefon')?.value) || '';
+    // v1.19.45: NICHT als `t` benennen — überschattet sonst die globale t()-Übersetzungsfunktion.
+    const tel = (document.getElementById('telefon')?.value) || '';
     const b = document.getElementById('breite').value || '0';
     const h = document.getElementById('hoehe').value || '0';
     // v1.18.22: Auf dem Etikett die ursprüngliche Maß-Stückzahl anzeigen
@@ -54,9 +55,9 @@ function generateEtikett() {
     ctx.fillText(k || '-', 36, 20);
 
     let y = 100;
-    if (t) {
+    if (tel) {
         ctx.font = '42px sans-serif';
-        ctx.fillText('Tel: ' + t, 36, y);
+        ctx.fillText('Tel: ' + tel, 36, y);
         y += 55;
     }
 
@@ -75,7 +76,7 @@ function generateEtikett() {
     y += 80;
 
     ctx.font = '42px sans-serif';
-    ctx.fillText(selectedColor + '  /  Stk: ' + s, 36, y);
+    ctx.fillText(t(selectedColor) + '  /  ' + t('Stk:') + ' ' + s, 36, y);
 
     // Order number links unten + Datum
     const orderNrCanvas = summarySlides[currentSlide]?.orderNumber || '';
@@ -132,12 +133,54 @@ function generateEtikett() {
 const origRenderAll = renderAll;
 renderAll = function() {
     origRenderAll.call ? origRenderAll() : (renderSummary(), renderTable(), renderAbstand(),
-        (() => { const bVal = parseFloat(document.getElementById('breite').value)||0; const hVal = parseFloat(document.getElementById('hoehe').value)||0; if(bVal && hVal) checkBWare(bVal, hVal, selectedColor); })());
+        (() => { const bVal = parseFloat(document.getElementById('breite').value)||0; const hVal = parseFloat(document.getElementById('hoehe').value)||0; const _mid = document.getElementById('rechnerModelId')?.value || ''; if(bVal && hVal) checkBWare(bVal, hVal, selectedColor, _mid); })());
     generateEtikett();
 };
 
-// ARTDEV Print Server URL (Termux on Tablet)
-const PRINT_SERVER = 'http://192.168.0.190:8150';
+// ARTDEV Print Server URL (Termux auf Tablet).
+// Wird in den Einstellungen vom User konfiguriert (localStorage). Default-Wert
+// passt für aktuelles Fritzbox-Netz (192.168.178.x). Falls die Tablet-IP sich
+// ändert: Einstellungen → "Drucker-Server URL" anpassen, kein Deploy nötig.
+const PRINT_SERVER_DEFAULT = 'http://192.168.178.25:8150';
+const PRINT_SERVER_STORAGE_KEY = 'fg_print_server_url';
+
+function getPrintServerUrl() {
+    try {
+        const stored = localStorage.getItem(PRINT_SERVER_STORAGE_KEY);
+        if (stored && stored.trim()) return stored.trim();
+    } catch (_) {}
+    return PRINT_SERVER_DEFAULT;
+}
+
+function savePrintServerUrl() {
+    const el = document.getElementById('printServerUrl');
+    if (!el) return;
+    const val = (el.value || '').trim();
+    try {
+        if (val) localStorage.setItem(PRINT_SERVER_STORAGE_KEY, val);
+        else localStorage.removeItem(PRINT_SERVER_STORAGE_KEY);
+    } catch (_) {}
+}
+
+function loadPrintServerUrl() {
+    const el = document.getElementById('printServerUrl');
+    if (!el) return;
+    try {
+        const stored = localStorage.getItem(PRINT_SERVER_STORAGE_KEY);
+        el.value = stored || PRINT_SERVER_DEFAULT;
+    } catch (_) {
+        el.value = PRINT_SERVER_DEFAULT;
+    }
+}
+
+// Beim DOMContentLoaded den gespeicherten Wert in das Eingabefeld laden.
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadPrintServerUrl);
+    } else {
+        loadPrintServerUrl();
+    }
+}
 
 // Direct print via ARTDEV AL-D460 (TSPL)
 async function druckenDirekt() {
@@ -146,7 +189,8 @@ async function druckenDirekt() {
     // kunde/telefon Inputs gibt's seit v1.15.0-p7 nicht mehr — Daten aus aktueller Slide nehmen
     const currentS = summarySlides && summarySlides[currentSlide];
     const k = (document.getElementById('kunde')?.value) || (currentS && currentS.kunde) || '-';
-    const t = (document.getElementById('telefon')?.value) || '';
+    // v1.19.45: NICHT als `t` benennen — überschattet die globale t()-Übersetzungsfunktion.
+    const tel = (document.getElementById('telefon')?.value) || '';
     const b = document.getElementById('breite').value || '0';
     const h = document.getElementById('hoehe').value || '0';
     // v1.18.22: Stk auf Etikett = ursprüngliche Maß-Stückzahl der Bestellung (z.B. "Stk: 2"),
@@ -181,11 +225,11 @@ async function druckenDirekt() {
     // verschoben — direkt unter der Filiale (450,290). Lange Kundennamen
     // überdecken die "1/5"-Anzeige nicht mehr.
     tspl += `TEXT 650,260,"3",0,1,1,"${stkIdx}/${totalStkAll}"\n`;
-    if (t) tspl += `TEXT 40,75,"3",0,1,1,"Tel: ${cleanTSPL(t)}"\n`;
+    if (tel) tspl += `TEXT 40,75,"3",0,1,1,"Tel: ${cleanTSPL(tel)}"\n`;
     tspl += 'BAR 40,120,720,3\n';
     tspl += `TEXT 40,140,"5",0,1,1,"${b} x ${h} cm"\n`;
     // v1.16.8-p5: Firmenname entfernt — wird durch Logo (PDF/Canvas) und Filiale (rechts unten) abgedeckt
-    tspl += `TEXT 40,215,"4",0,1,1,"${cleanTSPL(selectedColor)}  /  Stk: ${sDisplay}"\n`;
+    tspl += `TEXT 40,215,"4",0,1,1,"${cleanTSPL(t(selectedColor))}  /  ${cleanTSPL(t('Stk:'))} ${sDisplay}"\n`;
     const heute = new Date().toLocaleDateString('de-AT');
     const orderNr = summarySlides[currentSlide]?.orderNumber || '';
     const bestellDatum = summarySlides[currentSlide]?.bestelldatum || '';
@@ -199,7 +243,7 @@ async function druckenDirekt() {
     tspl += `PRINT ${copies},1\n`;
 
     // Open print server in new window (bypasses mixed content)
-    const printUrl = PRINT_SERVER + '?tspl=' + encodeURIComponent(tspl);
+    const printUrl = getPrintServerUrl() + '?tspl=' + encodeURIComponent(tspl);
     const printWin = window.open(printUrl, 'printwin', 'width=300,height=200');
     if (printWin) {
         showToast(`${copies > 1 ? copies + ' Etiketten' : 'Etikett'} gedruckt!`, 'success');
@@ -348,14 +392,14 @@ async function renderDashboard() {
         let orderTotal = 0;
         (o.measures||[]).forEach(m => {
             const b = parseFloat(m.breite)||0, h = parseFloat(m.hoehe)||0, s = m.stueck||1;
-            const p = m.sqmPrice || sqmPrice;
+            const p = (Number.isFinite(m.sqmPrice) ? m.sqmPrice : sqmPrice);
             const rawSqm = (b/100)*(h/100)*s;
             const billSqm = Math.max(rawSqm, 1*s);
             orderTotal += billSqm * p;
             totalSqm += rawSqm;
 
-            // Color stats
-            const farbe = m.farbe || o.farbe || 'Unbekannt';
+            // Color stats — v1.19.50: o.farbe abgeschafft → measures[0] Fallback
+            const farbe = m.farbe || (o.measures?.[0]?.farbe) || 'Unbekannt';
             if (!colorStats[farbe]) colorStats[farbe] = { sqm: 0, count: 0 };
             colorStats[farbe].sqm += rawSqm;
             colorStats[farbe].count += s;
@@ -383,8 +427,10 @@ async function renderDashboard() {
             }
         });
 
-        const savedTotal = o.totalPrice || 0;
-        const total = (savedTotal && Math.abs(savedTotal - orderTotal) > 0.02) ? savedTotal : (orderTotal || savedTotal);
+        // v1.19.17: 0 € als gültigen Override respektieren
+        const total = (Number.isFinite(o.totalPrice) && Math.abs(o.totalPrice - orderTotal) > 0.02)
+            ? o.totalPrice
+            : (orderTotal || (Number.isFinite(o.totalPrice) ? o.totalPrice : 0));
         totalRevenue += total;
         totalOpen += (total - paid);
     });
@@ -523,7 +569,7 @@ async function renderDashboard() {
 
     // Status overview
     html += `<div class="card"><div class="card-label">Status-Übersicht</div>`;
-    const statusColors = {'Reparatur':'#2563eb','Bestellung':'var(--primary)','In Produktion':'var(--amber)','Abholbereit':'#2563eb','Abgeholt':'var(--green)','B-Ware':'#8B4513','Gelöscht':'var(--text-muted)'};
+    const statusColors = {'Reparatur':'#2563eb','Bestellung':'var(--primary)','In Produktion':'var(--amber)','Transport':'#0e7490','Abholbereit':'#2563eb','Abgeholt':'var(--green)','B-Ware':'#8B4513','Gelöscht':'var(--text-muted)'};
     Object.entries(statusCounts).forEach(([col, count]) => {
         const pct = orderCount > 0 ? Math.round(count/periodOrders.length*100) : 0;
         html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0">
@@ -731,16 +777,51 @@ function exportOrderPDF(id) {
     const cd = cachedCompanyData || {};
     const logoSrc = cd.logoBase64 || '';
 
+    // v1.19.16: Bei Reparaturen ist der Preis pauschal (nicht m²-basiert). Wir zeigen
+    // den gespeicherten Pauschalbetrag in der ersten Zeile an, die weiteren Zeilen
+    // bekommen einen leeren Preis. So fließt der 48 €/m²-Standard nicht mehr ein.
+    // v1.19.22: Modell-Name + Farbe pro Maß ermitteln (für PDF-Differenzierung bei
+    // Multi-Modell-Bestellungen). Fallback auf "Fliegengitter <farbe>" für
+    // alte Bestellungen ohne modelId.
+    const getMeasureModel = (m) => {
+        if (!m.modelId) return null;
+        return (typeof cachedModels !== 'undefined') ? cachedModels.find(c => c.id === m.modelId) : null;
+    };
+    const getMeasureModelName = (m) => {
+        const mdl = getMeasureModel(m);
+        return mdl ? (mdl.name || '') : '';
+    };
+    const getMeasureModelColor = (m) => {
+        const mdl = getMeasureModel(m);
+        const c = mdl && mdl.color;
+        return (c && /^#[0-9a-fA-F]{6}$/.test(c)) ? c : '';
+    };
+
     const measuresRows = measures.map((m, i) => {
         const rawSqm = ((m.breite / 100) * (m.hoehe / 100) * (m.stueck || 1));
         const sqm = Math.max(rawSqm, 1 * (m.stueck || 1));
-        const price = sqm * (m.sqmPrice || sqmPrice);
+        let price;
+        if (o.isReparatur) {
+            price = (i === 0) ? (parseFloat(o.totalPrice) || 0) : 0;
+        } else {
+            price = sqm * ((Number.isFinite(m.sqmPrice) ? m.sqmPrice : sqmPrice));
+        }
+        const modelName = getMeasureModelName(m);
+        const modelColor = getMeasureModelColor(m);
+        const farbeText = m.farbe || (o.measures?.[0]?.farbe) || ''; // v1.19.50: o.farbe abgeschafft
+        const modelTag = modelName && modelColor
+            ? `<span style="display:inline-block;padding:2px 8px;border-radius:6px;background:${modelColor};color:#fff;font-size:11px;font-weight:700;letter-spacing:0.02em">${escHtml(modelName)}</span>`
+            : (modelName ? `<span style="font-weight:600">${escHtml(modelName)}</span>` : '');
+        const artikelHtml = modelName
+            ? `<div>${modelTag}</div>${farbeText ? `<div style="font-size:11px;color:#666;margin-top:2px">${escHtml(farbeText)}</div>` : ''}`
+            : `Fliegengitter ${escHtml(farbeText)}`;
         // Variant-Hinweise (v1.16.8-p1, p3, v1.17.3)
         const variantHints = [];
         const mv = m.variants || {};
         Object.keys(mv).forEach(vid => {
             if (vid === 'tuerart') return;
             if (vid === 'plisseeFarbe') return;
+            if (vid === 'netzFarbe') return;
             const variant = (typeof getVariant === 'function') ? getVariant(vid) : null;
             if (!variant) return;
             const opt = (variant.options || []).find(o => o.id === mv[vid]);
@@ -753,12 +834,16 @@ function exportOrderPDF(id) {
                 const pc = (typeof getPlisseeColor === 'function') ? getPlisseeColor(mv.plisseeFarbe) : null;
                 if (pc) label = (isYesLike ? variant.name : opt.label) + ' - ' + pc.name;
             }
+            if (opt.netzFollowup && mv.netzFarbe) {
+                const nc = (typeof getNetzColor === 'function') ? getNetzColor(mv.netzFarbe) : null;
+                if (nc) label = (isYesLike ? variant.name : opt.label) + ' - ' + nc.name;
+            }
             variantHints.push(label);
         });
         const variantStr = variantHints.length ? `<div style="font-size:11px;color:#534AB7;margin-top:2px;font-weight:600">${variantHints.map(escHtml).join(' · ')}</div>` : '';
         return `<tr>
             <td style="padding:10px 12px;border-bottom:1px solid #eee">${i + 1}</td>
-            <td style="padding:10px 12px;border-bottom:1px solid #eee">Fliegengitter ${m.farbe || o.farbe || ''}${variantStr}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #eee">${artikelHtml}${variantStr}</td>
             <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:center">${m.breite} × ${m.hoehe} cm${m.doppeltuer ? ' DT' : ''}</td>
             <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:center">${m.stueck || 1}</td>
             <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right">${sqm.toFixed(2)} m²</td>
@@ -767,12 +852,21 @@ function exportOrderPDF(id) {
     }).join('');
 
     // Skizzen pro Maß (v1.16.3) - kompakter Block am Ende
+    // v1.19.22: zusätzliches Modell-Label unter der Nummer für Multi-Modell-Klarheit
     const sketchesHtml = measures.map((m, i) => {
         const hasBP = m.variants && (m.variants.schwellenlos === 'ja' || m.variants.bodenprofil === 'ja');
         const svg = renderMasseSvg(m.breite, m.hoehe, !!m.doppeltuer, true, false, hasBP);
         const pills = renderMeasureVariantPills(m, {compact:true});
+        const modelName = getMeasureModelName(m);
+        const modelColor = getMeasureModelColor(m);
+        const modelLabel = modelName
+            ? (modelColor
+                ? `<div style="margin-top:2px;text-align:center"><span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;background:${modelColor};color:#fff">${escHtml(modelName)}</span></div>`
+                : `<div style="font-size:9px;color:#666;margin-top:2px;font-weight:600;text-align:center">${escHtml(modelName)}</div>`)
+            : '';
         return `<div class="sketch-item">
             <div class="sketch-num">${i + 1}</div>
+            ${modelLabel}
             <div class="sketch-svg">${svg}</div>
             ${pills}
         </div>`;

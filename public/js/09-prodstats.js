@@ -29,7 +29,7 @@
 
 const PRODSTATS_DAYS = 60;           // Auswertungs-Zeitraum
 const PRODSTATS_PUFFER_DAYS = 2;     // Puffer-Werktage zum berechneten Datum
-const PRODSTATS_SPAN_DAYS = 3;       // ± Tage für Frist-Spanne (also 6 Tage Spanne gesamt)
+const PRODSTATS_SPAN_DAYS = 2;       // v1.20.4: ± KALENDERtage (= 5-Tage-Fenster), vorher 3 Werktage
 
 // Österreichische Feiertage 2026 + 2027 (hartcodiert)
 // Erweitern wenn nötig — fixed date Feiertage + Pfingsten/Fronleichnam abhängig von Ostern
@@ -166,8 +166,10 @@ function getProductionStats() {
 
     orders.forEach(o => {
         if (!o.log || !Array.isArray(o.log)) return;
-        // Finde Log-Eintrag "nach Abholbereit verschoben"
-        const abhEntry = o.log.find(l => l.text && l.text.includes('nach Abholbereit verschoben'));
+        // Produktions-Abschluss = erstes "nach Transport verschoben" (Inegöl) ODER "nach Abholbereit verschoben" (Wien).
+        // .find liefert den chronologisch ersten Treffer → jede Bestellung wird genau EINMAL gezählt
+        // (kein Doppel bei Transport→Abholbereit; Inegöl-Produktion zählt am Produktionstag, nicht erst bei Ankunft).
+        const abhEntry = o.log.find(l => l.text && (l.text.includes('nach Transport verschoben') || l.text.includes('nach Abholbereit verschoben')));
         if (!abhEntry) return;
         const d = _prodstats_logDate(abhEntry);
         if (!d || d < cutoff) return;
@@ -246,6 +248,17 @@ function getProductionStats() {
  * @param {Number} additionalStk - zusätzliche Stk für neue Bestellung (optional)
  */
 function getProposedFristRange(additionalStk = 0) {
+    // v1.20.8: Manueller Modus — feste Wochen-Spanne (z.B. bei Urlaub), überschreibt die Auto-Berechnung.
+    if (typeof fristMode !== 'undefined' && fristMode === 'manual') {
+        const a = Math.max(0, parseFloat(typeof fristFromWeeks !== 'undefined' ? fristFromWeeks : 2) || 0);
+        const b = Math.max(a, parseFloat(typeof fristToWeeks !== 'undefined' ? fristToWeeks : 4) || 0);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const mk = w => { const d = new Date(today); d.setDate(d.getDate() + Math.round(w * 7)); return d; };
+        let from = mk(a), to = mk(b), mid = mk((a + b) / 2);
+        const minFrom = new Date(today); minFrom.setDate(minFrom.getDate() + 1);
+        if (from < minFrom) from = minFrom;
+        return { mid, from, to, days: Math.round(((a + b) / 2) * 7), valid: true, manual: true };
+    }
     const stats = getProductionStats();
     if (stats.avgPerDay <= 0) {
         return { mid: null, from: null, to: null, days: 0, valid: false };
@@ -258,8 +271,11 @@ function getProposedFristRange(additionalStk = 0) {
     const today = new Date();
     today.setHours(0,0,0,0);
     const mid = _prodstats_addWerktage(today, totalDays);
-    const from = _prodstats_addWerktage(today, Math.max(1, totalDays - PRODSTATS_SPAN_DAYS));
-    const to = _prodstats_addWerktage(today, totalDays + PRODSTATS_SPAN_DAYS);
+    // v1.20.4: Spanne in KALENDERtagen (±2 = 5-Tage-Fenster), Mitte unverändert.
+    let from = new Date(mid); from.setDate(from.getDate() - PRODSTATS_SPAN_DAYS);
+    const to = new Date(mid); to.setDate(to.getDate() + PRODSTATS_SPAN_DAYS);
+    const minFrom = new Date(today); minFrom.setDate(minFrom.getDate() + 1);
+    if (from < minFrom) from = minFrom;
 
     return { mid, from, to, days: totalDays, valid: true };
 }
@@ -331,16 +347,19 @@ function renderProductionBanner() {
 // ─── Frist-Vorschlag bei "Neue Bestellung" ──────────────────────────
 
 /**
- * Aktualisiert den Vorschlag neben dem Frist-Feld.
+ * Trägt die vorgeschlagene Frist-Spanne direkt in die Felder „Von" + „Bis" ein.
  * Wird beim Render des Neue-Bestellung-Forms aufgerufen, und immer wenn
- * sich die Stk ändern (live).
+ * sich die Stk ändern (live). Der frühere lila Hint-Banner ist entfernt —
+ * die Spanne ist direkt im Doppelt-Date-Feld sichtbar.
+ *
+ * Manuelle Änderungen am Datum bleiben erhalten: wenn der Mitarbeiter das
+ * Feld selbst angefasst hat (data-touched="1"), schreiben wir nichts mehr rein.
  */
 function renderFristVorschlag() {
     const hint = document.getElementById('fristVorschlagHint');
-    if (!hint) return;
+    const bisEl = document.getElementById('newFrist');
+    if (!bisEl) return;
 
-    // Berechne Stk der aktuellen "neuen Bestellung"
-    // Quelle: globales measureFields[] aus dem inline-Script
     let newStk = 0;
     try {
         if (typeof measureFields !== 'undefined' && Array.isArray(measureFields)) {
@@ -350,18 +369,14 @@ function renderFristVorschlag() {
 
     const prop = getProposedFristRange(newStk);
     if (!prop.valid) {
-        hint.style.display = 'none';
+        if (hint) hint.textContent = '';
         return;
     }
 
-    hint.style.display = 'block';
-    const ICON_BULB = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; vertical-align:-2px"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>';
-    hint.innerHTML = `
-        <div style="margin-top:4px; padding:8px 10px; background:#f0eeff; border-radius:8px; font-size:11px; color:#534AB7; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap">
-            <span style="display:flex; align-items:center; gap:5px">${ICON_BULB} Vorschlag: <strong>${_prodstats_formatDate(prop.from)} - ${_prodstats_formatDate(prop.to)}</strong></span>
-            <button type="button" onclick="applyFristVorschlag()" style="background:#534AB7; color:white; border:none; border-radius:6px; padding:5px 12px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit">Übernehmen</button>
-        </div>
-    `;
+    // Single-Feld-Variante: das eigentliche Frist-Feld trägt das BIS-Datum.
+    // Die volle Spanne (Von–Bis) erscheint als kleine Info darunter.
+    if (!bisEl.dataset.touched) bisEl.value = _prodstats_dateInputValue(prop.to);
+    if (hint) hint.textContent = `Spanne: ${_prodstats_formatDate(prop.from)} – ${_prodstats_formatDate(prop.to)}`;
 }
 
 /**
@@ -456,7 +471,7 @@ function getProductionStatsCardHTML() {
                 Lieferzeit-Prognose
             </div>
             <div style="background:#f0eeff; border-radius:10px; padding:12px; text-align:center">
-                <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px">Spanne (6 Werktage Fenster):</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px">Spanne (5-Tage-Fenster):</div>
                 <div style="font-size:15px; font-weight:700; color:var(--primary)">
                     ${_prodstats_formatDate(prop.from)} – ${_prodstats_formatDate(prop.to)}
                 </div>
