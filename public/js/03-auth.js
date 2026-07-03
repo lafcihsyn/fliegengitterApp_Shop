@@ -37,6 +37,8 @@ const PERM_GROUPS = {
         'orders_edit': 'Bestellungen bearbeiten',
         'orders_delete': 'Bestellungen löschen',
         'orders_payment': 'Zahlungen eintragen',
+        'order_price_edit': 'Bestellpreis ändern (Gesamtpreis einzelner Bestellung)',
+        'price_edit': 'm²-Preis ändern (global, in Einstellungen)',
         'orders_pdf': 'PDF exportieren',
         'orders_rechner': 'In Schnittliste öffnen',
         'reparatur_handle': 'Reparaturen erfassen & sehen',
@@ -65,7 +67,6 @@ const PERM_GROUPS = {
         'rechner_print': 'Etiketten drucken',
         'settings_view': 'Einstellungen anzeigen',
         'prices_view': 'Preise sehen (Beträge, Summen, €-Werte)',
-        'price_edit': 'm²-Preis ändern',
         'members_invite': 'Mitarbeiter einladen',
         'members_roles': 'Rollen verwalten',
         'mitarbeiter_leistung_view': 'Mitarbeiter-Leistung sehen (Produktions-Drill-down)',
@@ -100,7 +101,7 @@ const DEFAULT_PERMS = {
         // v1.19.14: prices_view standardmäßig true → kein Bruch für bestehende Mitarbeiter
         // Admin kann gezielt abhaken um Preise für einzelne Mitarbeiter zu verstecken.
         prices_view: true,
-        settings_view: false, price_edit: false, members_invite: false,
+        settings_view: false, price_edit: false, order_price_edit: false, members_invite: false,
         members_roles: false, mitarbeiter_leistung_view: false, columns_manage: false,
         buchhaltung_view: false, buchhaltung_export: false
     }

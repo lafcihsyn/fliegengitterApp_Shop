@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.9-kombi-falten';
+const CACHE_NAME = 'fliegengitter-v1.20.10-preis-recht-b';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

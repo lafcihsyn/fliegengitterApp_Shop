@@ -642,8 +642,8 @@ function calcEditPrice(orderId) {
 
     let html = '';
 
-    // Total line - editable for admin
-    if (isAdmin()) {
+    // Total line - editierbar nur mit Recht "Bestellpreis ändern" (Admin/Superadmin automatisch)
+    if (typeof hasPerm === 'function' && hasPerm('order_price_edit')) {
         html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 8px;border-top:2px solid var(--border)">
             <span style="font-size:16px;font-weight:700">Gesamt</span>
             <div style="display:flex;align-items:center;gap:6px">
@@ -866,20 +866,39 @@ async function doSaveOrderEdit(id) {
         return measureObj;
     });
 
-    // Check if admin overrode the total price
-    if (isAdmin() && totalOverrideValue !== null && Math.abs(totalOverrideValue - totalPrice) > 0.01) {
-        totalPrice = totalOverrideValue;
-        changes.push('Preis manuell auf € ' + totalPrice.toFixed(2) + ' geändert');
-    }
-    // v1.19.16: Bei Reparatur ist der Pauschal-Preis IMMER der Wert aus dem Reparatur-Feld
-    // (auch 0 €). Berechtigung: jeder mit price_edit (oder Admin) darf den Reparatur-Preis ändern.
-    if (o.isReparatur && totalOverrideValue !== null) {
-        totalPrice = totalOverrideValue;
-        // Pro Maß sqmPrice auf 0 setzen damit keine zukünftige m²-Rechnung erfolgt
-        measures.forEach(mm => { mm.sqmPrice = 0; });
-        if (Math.abs((o.totalPrice || 0) - totalPrice) > 0.01) {
-            changes.push('Reparatur-Preis: € ' + (o.totalPrice || 0).toFixed(2) + ' → € ' + totalPrice.toFixed(2));
+    // v1.20.10: autoPrice = aus Maßen berechnet. Persistenter Merker `priceManual` sorgt dafür,
+    // dass ein manuell gesetzter Gesamtpreis bei späteren Speichern (Zahlung, Name…) NICHT
+    // überschrieben wird. Recht zum Ändern: order_price_edit (Admin/Superadmin automatisch).
+    const autoPrice = totalPrice;
+    let priceManual = !!o.priceManual;
+    const canEditPrice = (typeof hasPerm === 'function') && hasPerm('order_price_edit');
+
+    if (canEditPrice && totalOverrideValue !== null) {
+        if (Math.abs(totalOverrideValue - autoPrice) > 0.01) {
+            totalPrice = totalOverrideValue;
+            priceManual = true;
+            changes.push('Preis manuell auf € ' + totalPrice.toFixed(2) + ' geändert');
+        } else {
+            priceManual = false; // eingegebener Wert = Auto-Preis → manueller Preis aufgehoben
         }
+    } else if (priceManual && Number.isFinite(o.totalPrice)) {
+        // Kein neuer Override, Bestellung ist als manuell markiert → gespeicherten Preis BEHALTEN
+        totalPrice = o.totalPrice;
+    }
+
+    // v1.19.16 + v1.20.10: Reparatur-Pauschalpreis ist IMMER manuell — Wert aus dem Reparatur-Feld,
+    // sonst der gespeicherte Preis (nicht auf 0 zurückrechnen). sqmPrice pro Maß = 0.
+    if (o.isReparatur) {
+        if (totalOverrideValue !== null) {
+            totalPrice = totalOverrideValue;
+            if (Math.abs((o.totalPrice || 0) - totalPrice) > 0.01) {
+                changes.push('Reparatur-Preis: € ' + (o.totalPrice || 0).toFixed(2) + ' → € ' + totalPrice.toFixed(2));
+            }
+        } else if (Number.isFinite(o.totalPrice)) {
+            totalPrice = o.totalPrice;
+        }
+        measures.forEach(mm => { mm.sqmPrice = 0; });
+        priceManual = true;
     }
     totalOverrideValue = null;
 
@@ -888,6 +907,7 @@ async function doSaveOrderEdit(id) {
         measures,
         totalSqm: parseFloat(totalSqm.toFixed(4)),
         totalPrice: parseFloat(totalPrice.toFixed(2)),
+        priceManual,
         anzahlung,
         frist: frist||null,
         bestelldatum: bestelldatum||null,
