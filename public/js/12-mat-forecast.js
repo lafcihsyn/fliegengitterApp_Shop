@@ -13,6 +13,9 @@
 //   - t, escHtml, showToast, formatNum
 // ═══════════════════════════════════════════════════════════════════
 
+// v1.20.11: aktueller Materialbedarf (für Auswahl + Export CSV/Drucken/Teilen)
+let _forecastMats = [];
+
 const FORECAST_OPEN_COLUMNS = ['Bestellung', 'In Produktion', 'Warteliste'];
 
 let _forecastMaterials = null;
@@ -146,6 +149,7 @@ async function loadMatForecast() {
             if (a.sortOrder !== b.sortOrder) return (a.sortOrder || 0) - (b.sortOrder || 0);
             return (a.name || '').localeCompare(b.name || '');
         });
+        _forecastMats = mats; // v1.20.11: für Auswahl-Export merken
 
         if (!mats.length) {
             contentEl.innerHTML = `<div class="card" style="text-align:center;color:var(--text-muted);padding:24px">
@@ -163,7 +167,17 @@ async function loadMatForecast() {
             ${escHtml(t('Berechnet über'))} <strong>${orderCount}</strong> ${escHtml(t('offene Bestellungen'))}.
         </div>`;
 
-        html += `<div class="card" style="padding:0;overflow:hidden">
+        // v1.20.11: Toolbar — Auswahl + Export
+        html += `<div class="card" style="padding:8px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
+                <input type="checkbox" id="forecastSelectAll" checked onchange="forecastToggleAll(this.checked)" style="width:18px;height:18px;accent-color:var(--primary)"> ${escHtml(t('Alle'))}
+            </label>
+            <span style="flex:1"></span>
+            <button class="logout-btn" onclick="forecastExportCSV()">📄 CSV</button>
+            <button class="logout-btn" onclick="forecastPrint()">🖨️ Drucken/PDF</button>
+            ${(typeof navigator !== 'undefined' && navigator.share) ? '<button class="logout-btn" onclick="forecastShare()">📤 Teilen</button>' : ''}
+        </div>`;
+        html += `<div class="card" style="padding:0;overflow:hidden;margin-top:8px">
             <table style="width:100%;border-collapse:collapse;font-size:13px">
                 <thead>
                     <tr style="background:var(--border-light);text-transform:uppercase;font-size:11px;letter-spacing:0.04em;color:var(--text-muted)">
@@ -183,7 +197,7 @@ async function loadMatForecast() {
 
             const stangenSuffixTotal = _formatStangenSuffix(m.totalAll, m.type, m.purchaseLength);
             html += `<tr style="border-top:1px solid var(--border-light)">
-                <td style="padding:10px 12px;font-weight:700">${escHtml(m.name)} <span style="font-size:10px;color:var(--text-muted);font-weight:500;text-transform:uppercase;margin-left:6px">${escHtml(m.type)}</span></td>
+                <td style="padding:10px 12px;font-weight:700;text-align:left"><label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" class="fc-check" checked data-matid="${escHtml(m.materialId)}" style="width:17px;height:17px;accent-color:var(--primary);flex-shrink:0"><span>${escHtml(m.name)} <span style="font-size:10px;color:var(--text-muted);font-weight:500;text-transform:uppercase;margin-left:2px">${escHtml(m.type)}</span></span></label></td>
                 <td style="padding:10px 12px;text-align:right;font-weight:700">${escHtml(_formatForecastValue(m.totalAll, m.einheit))}${stangenSuffixTotal}</td>
             </tr>`;
 
@@ -252,4 +266,127 @@ async function loadMatForecast() {
         console.error('loadMatForecast:', e);
         contentEl.innerHTML = `<div class="card" style="color:var(--red);padding:14px">${escHtml(t('Fehler:'))} ${escHtml(e.message || String(e))}</div>`;
     }
+}
+
+// ═══ v1.20.11: Materialbedarf — Auswahl + Export (CSV / Drucken→PDF / Teilen) ═══
+
+function forecastToggleAll(checked) {
+    document.querySelectorAll('.fc-check').forEach(cb => { cb.checked = checked; });
+}
+
+// gewählte Hauptmaterialien aus dem zuletzt berechneten Forecast
+function _forecastSelected() {
+    const ids = new Set();
+    document.querySelectorAll('.fc-check:checked').forEach(cb => ids.add(cb.getAttribute('data-matid')));
+    return (_forecastMats || []).filter(m => ids.has(m.materialId));
+}
+
+// Wert inkl. Stangen-Zusatz als KLARTEXT (ohne HTML). _formatStangenSuffix liefert ein
+// <span>…</span> — für CSV/Druck/Teilen brauchen wir reinen Text, sonst erscheinen die Tags wörtlich.
+function _fcVal(m, val) {
+    return (_formatForecastValue(val, m.einheit) + _formatStangenSuffix(val, m.type, m.purchaseLength)).replace(/<[^>]*>/g, '');
+}
+
+// flache Zeilen: Hauptmaterial + (bei Mehrfarbig) Farb-Aufschlüsselung
+function _forecastRows(sel) {
+    const rows = [];
+    sel.forEach(m => {
+        rows.push({ material: m.name, typ: m.type, farbe: '', menge: _fcVal(m, m.totalAll) });
+        const entries = Object.entries(m.byFarbe || {});
+        if (m.byColor && entries.length > 1) {
+            entries.forEach(([farbe, val]) => rows.push({ material: m.name, typ: m.type, farbe, menge: _fcVal(m, val) }));
+        }
+    });
+    return rows;
+}
+
+function _forecastFilename(ext) {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `materialbedarf_${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}.${ext}`;
+}
+
+function _forecastCSV(sel) {
+    let csv = 'Material;Typ;Farbe;Menge\n';
+    _forecastRows(sel).forEach(r => {
+        csv += [r.material, r.typ, r.farbe, r.menge].map(x => '"' + String(x).replace(/"/g, '""') + '"').join(';') + '\n';
+    });
+    return csv;
+}
+
+function forecastExportCSV() {
+    const sel = _forecastSelected();
+    if (!sel.length) { showToast(t('Keine Materialien ausgewählt.'), 'warning'); return; }
+    const blob = new Blob(['﻿' + _forecastCSV(sel)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = _forecastFilename('csv');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function forecastPrint() {
+    const sel = _forecastSelected();
+    if (!sel.length) { showToast(t('Keine Materialien ausgewählt.'), 'warning'); return; }
+    const dateStr = new Date().toLocaleDateString('de-DE');
+    let body = '';
+    sel.forEach(m => {
+        body += `<tr><td><b>${escHtml(m.name)}</b> <span class="typ">${escHtml(m.type)}</span></td><td class="r"><b>${escHtml(_fcVal(m, m.totalAll))}</b></td></tr>`;
+        const entries = Object.entries(m.byFarbe || {});
+        if (m.byColor && entries.length > 1) {
+            entries.forEach(([farbe, val]) => {
+                body += `<tr class="sub"><td>${escHtml(farbe)}</td><td class="r">${escHtml(_fcVal(m, val))}</td></tr>`;
+            });
+        }
+    });
+    const doc = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Materialbedarf ${escHtml(dateStr)}</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}
+h1{font-size:18px;margin:0 0 2px} .date{color:#666;font-size:12px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:7px 8px;border-bottom:1px solid #eee} .r{text-align:right}
+thead td{border-bottom:2px solid #333;font-weight:700;text-transform:uppercase;font-size:11px;color:#555}
+.typ{color:#999;font-size:10px;text-transform:uppercase;margin-left:6px}
+tr.sub td{padding:4px 8px 4px 22px;color:#555;border-bottom:1px solid #f5f5f5;font-size:12px}
+@media print{body{padding:0}}
+</style></head><body>
+<h1>Materialbedarf</h1><div class="date">Stand: ${escHtml(dateStr)} · ${sel.length} Material(ien)</div>
+<table><thead><tr><td>Material</td><td class="r">Gesamt</td></tr></thead><tbody>${body}</tbody></table>
+</body></html>`;
+    // v1.20.11b: Druck über verstecktes iframe (kein neues Fenster) → Nutzer bleibt in der App
+    // (kein „kein Zurück"-Problem), und Pop-up-Blocker greifen nicht.
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(iframe);
+    const idoc = iframe.contentWindow.document;
+    idoc.open(); idoc.write(doc); idoc.close();
+    const cleanup = () => { try { iframe.remove(); } catch (e) {} };
+    iframe.contentWindow.onafterprint = () => setTimeout(cleanup, 200);
+    setTimeout(() => {
+        try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+        catch (e) { cleanup(); }
+        setTimeout(cleanup, 60000); // Sicherheits-Cleanup falls onafterprint nicht feuert
+    }, 300);
+}
+
+async function forecastShare() {
+    const sel = _forecastSelected();
+    if (!sel.length) { showToast(t('Keine Materialien ausgewählt.'), 'warning'); return; }
+    let text = 'Materialbedarf ' + new Date().toLocaleDateString('de-DE') + '\n\n';
+    sel.forEach(m => {
+        text += '• ' + m.name + ': ' + _fcVal(m, m.totalAll) + '\n';
+        const entries = Object.entries(m.byFarbe || {});
+        if (m.byColor && entries.length > 1) entries.forEach(([f, v]) => { text += '   – ' + f + ': ' + _fcVal(m, v) + '\n'; });
+    });
+    try {
+        const file = new File(['﻿' + _forecastCSV(sel)], _forecastFilename('csv'), { type: 'text/csv' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ title: 'Materialbedarf', text, files: [file] });
+        } else if (navigator.share) {
+            await navigator.share({ title: 'Materialbedarf', text });
+        } else {
+            showToast(t('Teilen wird hier nicht unterstützt — nutze CSV.'), 'warning');
+        }
+    } catch (e) { /* Nutzer-Abbruch — ignorieren */ }
 }
