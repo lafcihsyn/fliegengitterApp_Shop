@@ -336,9 +336,10 @@ function renderBoardCards() {
 
     if (!filtered.length) {
         const bwareBtn = activeColumn === 'B-Ware' ? `<button class="action-btn primary" onclick="showBwareForm()" style="margin-top:12px">＋ B-Ware eintragen</button>` : '';
+        const repBtnEmpty = (activeColumn === 'Reparatur' && hasPerm('reparatur_handle')) ? `<button class="action-btn primary" onclick="openReparaturForm('')" style="margin-top:12px;background:#2563eb">🔧 Externe Reparatur erfassen</button>` : '';
         const emptyMsg = searchTerm
             ? `<div class="empty-state"><div class="empty-state-icon">🔍</div>Keine Ergebnisse für "${searchTerm}"</div>`
-            : `<div class="empty-state"><div class="empty-state-icon">'—'</div>Keine Bestellungen in "${activeColumn}"${bwareBtn}</div>`;
+            : `<div class="empty-state"><div class="empty-state-icon">'—'</div>Keine Bestellungen in "${activeColumn}"${bwareBtn}${repBtnEmpty}</div>`;
         // Sortier-Knopf trotzdem zeigen, damit der Mitarbeiter sehen kann was eingestellt ist
         const currentSort = getColumnSort(activeColumn);
         const currentSortLabel = (SORT_OPTIONS.find(o => o.id === currentSort) || SORT_OPTIONS[0]).label;
@@ -356,6 +357,11 @@ function renderBoardCards() {
     let bwareTopBtn = '';
     if (activeColumn === 'B-Ware') {
         bwareTopBtn = `<button onclick="showBwareForm()" style="width:100%;padding:12px;background:#8B4513;color:white;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">＋ <span style="display:inline-flex;vertical-align:middle;margin-right:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 4.875 7.97l3.418-3.421"/><path d="M17 3.414 13.582 7 17 10.586"/><path d="m9.5 4.39 3.918-1.247 1.247 3.918"/></svg></span> B-Ware eintragen</button>`;
+    }
+    // v1.20.12: Externe Reparatur — Knopf oben in der Reparatur-Spalte
+    let repTopBtn = '';
+    if (activeColumn === 'Reparatur' && hasPerm('reparatur_handle')) {
+        repTopBtn = `<button onclick="openReparaturForm('')" style="width:100%;padding:12px;background:#2563eb;color:white;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">🔧 ＋ Externe Reparatur erfassen</button>`;
     }
     // Sortier-Knopf oben anzeigen (v1.13.1) - kompakter Header mit Sortier-Info
     const sortBtn = `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px 8px;font-size:11px;color:var(--text-muted)">
@@ -527,7 +533,7 @@ function renderBoardCards() {
         </div>`;
       } catch(err) { console.error('Card render error:', o.id, err); return '<div style="color:red;padding:10px">Fehler: '+err.message+'</div>'; }
     }).join('');
-    el.innerHTML = sortBtn + bwareTopBtn + el.innerHTML;
+    el.innerHTML = sortBtn + bwareTopBtn + repTopBtn + el.innerHTML;
 }
 
 async function quickMove(id, toCol) {

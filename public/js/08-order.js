@@ -1443,42 +1443,75 @@ function confirmDeleteDraft(draftId) {
 // ═══ REPARATUR-FEATURE (v1.13.1) ═══
 
 // Öffnet Reparatur-Erfassungs-Dialog für eine bestehende (abgeholte) Bestellung
+// v1.20.12: fortlaufende Nummer für externe Reparaturen (#R-2026-001, …)
+function _generateExternalReparaturNumber() {
+    const year = new Date().getFullYear();
+    const prefix = '#R-' + year + '-';
+    let max = 0;
+    (orders || []).forEach(o => {
+        const n = o.orderNumber || '';
+        if (n.indexOf(prefix) === 0) {
+            const num = parseInt(n.slice(prefix.length), 10);
+            if (!isNaN(num) && num > max) max = num;
+        }
+    });
+    return prefix + String(max + 1).padStart(3, '0');
+}
+
+// originalId leer/falsy = EXTERNE Reparatur (Gitter nicht bei uns bestellt) → Kunde + Modell manuell.
 function openReparaturForm(originalId) {
     if (!hasPerm('reparatur_handle')) { showToast('Keine Berechtigung.', 'warning'); return; }
-    const orig = orders.find(x => x.id === originalId);
-    if (!orig) { showToast('Bestellung nicht gefunden.', 'error'); return; }
+    const isExtern = !originalId;
+    const orig = isExtern ? null : orders.find(x => x.id === originalId);
+    if (!isExtern && !orig) { showToast('Bestellung nicht gefunden.', 'error'); return; }
 
-    // Maße der Original-Bestellung als Vorlage übernehmen
-    window._reparaturMeasures = (orig.measures || []).map(m => ({
+    // Maße: bei Extern leer (manuell), sonst von der Original-Bestellung als Vorlage
+    window._reparaturMeasures = isExtern ? [] : (orig.measures || []).map(m => ({
         breite: m.breite, hoehe: m.hoehe, stueck: m.stueck || 1,
         farbe: m.farbe || (orig.measures?.[0]?.farbe) || 'Antrazit',
         doppeltuer: !!m.doppeltuer,
         sqmPrice: 0  // Reparatur hat eigenen Preis, sqmPrice nicht relevant
     }));
+    const modelOpts = (typeof cachedModels !== 'undefined' ? cachedModels : []).filter(m => m.active !== false).map(m => `<option value="${escHtml(m.id)}">${escHtml(m.name)}</option>`).join('');
 
     // Filiale-Optionen (für Auswahl bei Reparatur)
     const filialeOpts = [
         '<option value="">— keine Filiale —</option>',
-        ...filialen.map(f => `<option value="${f.id}" ${f.id === (currentUserFilialeId || orig.filialeId || '') ? 'selected' : ''}>${escHtml(f.name)}</option>`)
+        ...filialen.map(f => `<option value="${f.id}" ${f.id === (currentUserFilialeId || (orig && orig.filialeId) || '') ? 'selected' : ''}>${escHtml(f.name)}</option>`)
     ].join('');
 
     // Heutiges Datum als Default für Bestelldatum der Reparatur
     const today = new Date().toISOString().split('T')[0];
-    const fullName = ((orig.vorname || '') + ' ' + (orig.nachname || '')).trim();
+    const fullName = orig ? ((orig.vorname || '') + ' ' + (orig.nachname || '')).trim() : '';
 
     const overlay = document.createElement('div');
     overlay.className = 'edit-overlay';
     overlay.innerHTML = `
         <div class="edit-modal" style="max-width:560px">
             <div class="edit-header">
-                <span>🔧 Reparatur erfassen</span>
+                <span>${isExtern ? '🔧 Externe Reparatur' : '🔧 Reparatur erfassen'}</span>
                 <button class="close-btn" onclick="this.closest('.edit-overlay').remove()">×</button>
             </div>
             <div class="edit-body">
+                ${isExtern ? `
+                <div style="margin-bottom:12px;padding:10px 12px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:8px;font-size:12px;color:#1e40af;line-height:1.5">
+                    <strong>Externe Reparatur</strong> — Fliegengitter, das NICHT bei uns bestellt wurde. Kunde + Maße bitte manuell eintragen.
+                </div>
+                <div class="edit-field"><label>Kunde (Name)</label>
+                    <input type="text" class="em-input" id="repKunde" placeholder="Vor- und Nachname">
+                </div>
+                <div class="edit-field"><label>Telefon (optional)</label>
+                    <input type="tel" class="em-input" id="repTelefon" inputmode="tel" placeholder="Telefonnummer">
+                </div>
+                <div class="edit-field"><label>Modell (optional)</label>
+                    <select class="em-input" id="repModell"><option value="">— kein Modell —</option>${modelOpts}</select>
+                </div>
+                ` : `
                 <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-light);border-radius:8px;font-size:13px;line-height:1.5">
                     <div><strong>Original-Bestellung:</strong></div>
                     <div style="color:var(--text-muted);margin-top:2px">${escHtml(orig.orderNumber || '—')} · ${escHtml(fullName)} · ${orig.bestelldatum ? orig.bestelldatum.split('-').reverse().join('.') : ''}</div>
                 </div>
+                `}
 
                 <div class="edit-field"><label>Bemerkung zur Reparatur</label>
                     <textarea class="em-input" id="repBemerkung" rows="2" placeholder="z.B. Kunde hatte falsch gemessen, kürzen auf 95×195"></textarea>
@@ -1555,8 +1588,9 @@ function addReparaturMeasure() {
 
 async function saveReparatur(originalId) {
     if (!hasPerm('reparatur_handle')) { showToast('Keine Berechtigung.', 'warning'); return; }
-    const orig = orders.find(x => x.id === originalId);
-    if (!orig) { showToast('Original-Bestellung nicht gefunden.', 'error'); return; }
+    const isExtern = !originalId;
+    const orig = isExtern ? null : orders.find(x => x.id === originalId);
+    if (!isExtern && !orig) { showToast('Original-Bestellung nicht gefunden.', 'error'); return; }
 
     const measures = (window._reparaturMeasures || []).filter(m => m.breite > 0 && m.hoehe > 0);
     if (!measures.length) { showToast('Mindestens ein gültiges Maß nötig.', 'warning'); return; }
@@ -1574,30 +1608,42 @@ async function saveReparatur(originalId) {
         return;
     }
 
-    // Reparatur-Nummer generieren: Original-Nr + "-R1", "-R2", ...
-    const baseNum = orig.orderNumber || '#R';
-    const existingReparaturen = orders.filter(o => o.originalOrderId === originalId);
-    const repIndex = existingReparaturen.length + 1;
-    const reparaturNumber = baseNum + '-R' + repIndex;
+    // Reparatur-Nummer + Kundendaten + optionales Modell
+    let reparaturNumber, repVorname, repNachname, repTelefon, extModelId = '';
+    if (isExtern) {
+        const fullName = ((document.getElementById('repKunde') || {}).value || '').trim();
+        if (!fullName) { showToast('Bitte Kundennamen eintragen.', 'warning'); return; }
+        const parts = fullName.split(/\s+/);
+        repVorname = parts.length > 1 ? parts.slice(0, -1).join(' ') : fullName;
+        repNachname = parts.length > 1 ? parts[parts.length - 1] : '';
+        repTelefon = ((document.getElementById('repTelefon') || {}).value || '').trim();
+        extModelId = ((document.getElementById('repModell') || {}).value || '');
+        reparaturNumber = _generateExternalReparaturNumber();
+    } else {
+        const baseNum = orig.orderNumber || '#R';
+        const existingReparaturen = orders.filter(o => o.originalOrderId === originalId);
+        reparaturNumber = baseNum + '-R' + (existingReparaturen.length + 1);
+        repVorname = orig.vorname || ''; repNachname = orig.nachname || ''; repTelefon = orig.telefon || '';
+    }
 
     // measures aufbereiten — Modell-Info aus Original übernehmen wenn vorhanden
+    const orig0 = isExtern ? {} : ((orig.measures || [])[0] || {});
+    const repModelId = isExtern ? extModelId : orig0.modelId;  // Extern: gewähltes Modell (optional)
     const newMeasures = measures.map(m => {
-        const orig0 = (orig.measures || [])[0] || {};
         const measureObj = {
             breite: m.breite, hoehe: m.hoehe, stueck: m.stueck || 1,
             farbe: m.farbe || 'Antrazit',
             sqmPrice: 0,  // Reparatur-Preis ist pauschal, nicht m²-basiert
             doppeltuer: !!m.doppeltuer
         };
-        // Modell-Felder aus Original übernehmen falls vorhanden (R1-Migration, R2 erweitert)
-        if (orig0.modelId) {
-            measureObj.modelId = orig0.modelId;
-            // Varianten vom Original übernehmen (Reparatur = hart vom Original gem. v1.13.1)
-            const variants = Object.assign({}, orig0.variants || {});
+        if (repModelId) {
+            measureObj.modelId = repModelId;
+            // From-Order: Varianten hart vom Original; Extern: nur tuerart aus Doppeltür
+            const variants = Object.assign({}, isExtern ? {} : (orig0.variants || {}));
             variants.tuerart = m.doppeltuer ? 'doppel' : 'einzel';
             measureObj.variants = variants;
             measureObj.bemerkung = '';
-            measureObj.materialColors = orig0.materialColors || {};
+            measureObj.materialColors = isExtern ? {} : (orig0.materialColors || {});
         }
         attachMeasureNames(measureObj); // v1.19.59: Namen mitspeichern
         return measureObj;
@@ -1610,13 +1656,14 @@ async function saveReparatur(originalId) {
         const newDocRef = await db.collection('orders').add({
             // Identifikation
             isReparatur: true,
-            originalOrderId: originalId,
-            originalOrderNumber: orig.orderNumber || '',
+            externalRepair: isExtern,
+            originalOrderId: isExtern ? '' : originalId,
+            originalOrderNumber: isExtern ? '' : (orig.orderNumber || ''),
             orderNumber: reparaturNumber,
-            // Kundendaten von Original
-            vorname: orig.vorname || '',
-            nachname: orig.nachname || '',
-            telefon: orig.telefon || '',
+            // Kundendaten (Extern: manuell eingegeben, sonst vom Original)
+            vorname: repVorname,
+            nachname: repNachname,
+            telefon: repTelefon,
             // v1.19.50: kein o.farbe mehr — measures[i].farbe ist Quelle der Wahrheit
             measures: newMeasures,
             totalSqm: parseFloat(totalSqm.toFixed(4)),
@@ -1638,17 +1685,19 @@ async function saveReparatur(originalId) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdBy: currentUser ? currentUser.email : 'unknown',
             log: [
-                { time: firebase.firestore.Timestamp.now(), text: getUserName() + ' hat Reparatur erfasst (Original: ' + (orig.orderNumber || originalId.slice(0,6)) + ')' }
+                { time: firebase.firestore.Timestamp.now(), text: getUserName() + (isExtern ? ' hat externe Reparatur erfasst' : (' hat Reparatur erfasst (Original: ' + (orig.orderNumber || originalId.slice(0,6)) + ')')) }
             ]
         });
 
-        // Original-Bestellung um Verweis ergänzen + Log-Eintrag
-        await db.collection('orders').doc(originalId).update({
-            log: firebase.firestore.FieldValue.arrayUnion({
-                time: firebase.firestore.Timestamp.now(),
-                text: getUserName() + ' hat Reparatur ' + reparaturNumber + ' erfasst'
-            })
-        });
+        // Original-Bestellung um Verweis ergänzen (nur wenn es eine Ur-Bestellung gibt)
+        if (!isExtern) {
+            await db.collection('orders').doc(originalId).update({
+                log: firebase.firestore.FieldValue.arrayUnion({
+                    time: firebase.firestore.Timestamp.now(),
+                    text: getUserName() + ' hat Reparatur ' + reparaturNumber + ' erfasst'
+                })
+            });
+        }
 
         // Modal schließen
         document.querySelector('.edit-overlay')?.remove();

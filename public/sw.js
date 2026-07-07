@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.11-materialbedarf-export-c';
+const CACHE_NAME = 'fliegengitter-v1.20.12-externe-reparatur';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
