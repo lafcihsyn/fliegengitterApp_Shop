@@ -1312,7 +1312,7 @@ let drafts = [];
 let editMeasures = [];
 let summarySlides = [];
 let currentSlide = 0;
-const APP_VERSION = '1.20.12';
+const APP_VERSION = '1.20.14';
 const MAX_MASS_CM = 600; // Maximale Breite/Höhe in cm – Schutz vor Tippfehlern
 let unsubOrders = null;
 let sqmPrice = 25;
@@ -1975,16 +1975,17 @@ function _drillRangeStart(range) {
 // und dessen Filiale. Filiale „none" = produzierende Mitarbeiter ohne Filiale-Zuordnung.
 function _producerFilialeId(o) {
     const members = window.cachedMembers || [];
-    // Bevorzugt: abholbereitBy = Email des Produzenten → cachedMember.filialeId
-    if (o.abholbereitBy) {
-        const m = members.find(x => x && x.email === o.abholbereitBy);
+    // v1.20.13: Produktion = Transport-Move (Inegöl) hat Vorrang, sonst Abholbereit-Move (Wien)
+    const prodBy = o.transportBy || o.abholbereitBy;
+    if (prodBy) {
+        const m = members.find(x => x && x.email === prodBy);
         if (m) return m.filialeId || '';
         // Email kein bekannter Member mehr (gelöscht) → unbekannt
         return '';
     }
     // Fallback: Log-Text → Name → Member-Match
     if (o.log) {
-        const entry = o.log.find(l => l && l.text && l.text.includes('nach Abholbereit verschoben'));
+        const entry = o.log.find(l => l && l.text && (l.text.includes('nach Transport verschoben') || l.text.includes('nach Abholbereit verschoben')));
         if (entry) {
             const m = entry.text.match(/^(\S+)\s+hat\s+/);
             if (m) {
@@ -2002,11 +2003,13 @@ function getOrdersProducedByFiliale(filialeId, fromDate, toDate) {
     const result = [];
     orders.forEach(o => {
         let logDate = null;
-        if (o.abholbereitAt) {
-            logDate = o.abholbereitAt.toDate ? o.abholbereitAt.toDate()
-                    : (o.abholbereitAt.seconds ? new Date(o.abholbereitAt.seconds * 1000) : null);
+        // v1.20.13: Transport-Move (Inegöl) hat Vorrang als Produktions-Zeitpunkt, sonst Abholbereit
+        const prodAt = o.transportAt || o.abholbereitAt;
+        if (prodAt) {
+            logDate = prodAt.toDate ? prodAt.toDate()
+                    : (prodAt.seconds ? new Date(prodAt.seconds * 1000) : null);
         } else if (o.log) {
-            const entry = o.log.find(l => l && l.text && l.text.includes('nach Abholbereit verschoben'));
+            const entry = o.log.find(l => l && l.text && (l.text.includes('nach Transport verschoben') || l.text.includes('nach Abholbereit verschoben')));
             if (entry) logDate = (typeof _prodstats_logDate === 'function') ? _prodstats_logDate(entry) : null;
         }
         if (!logDate || logDate < fromDate) return;
@@ -2088,14 +2091,19 @@ function openFilialeDrillDown(filialeId) {
         return ms.map(m => `${m.breite}x${m.hoehe}`).join(' · ');
     }
     function getMitarbeiter(o) {
-        // Bevorzugt direkt aus o.abholbereitByName, sonst aus Log-Text parsen
+        // v1.20.13: Produktion = Transport-Move (Inegöl) hat Vorrang, sonst Abholbereit-Move (Wien)
+        if (o.transportByName) return o.transportByName;
+        if (o.transportBy) {
+            const local = o.transportBy.split('@')[0];
+            return local.charAt(0).toUpperCase() + local.slice(1);
+        }
         if (o.abholbereitByName) return o.abholbereitByName;
         if (o.abholbereitBy) {
             const local = o.abholbereitBy.split('@')[0];
             return local.charAt(0).toUpperCase() + local.slice(1);
         }
         if (o.log) {
-            const entry = o.log.find(l => l && l.text && l.text.includes('nach Abholbereit verschoben'));
+            const entry = o.log.find(l => l && l.text && (l.text.includes('nach Transport verschoben') || l.text.includes('nach Abholbereit verschoben')));
             if (entry) {
                 const m = entry.text.match(/^(\S+)\s+hat\s+/);
                 if (m) return m[1];
@@ -2307,17 +2315,21 @@ function getOrdersProducedBy(email, fromDate, toDate) {
     const result = [];
     orders.forEach(o => {
         let logDate = null;
-        // 1) Neuer Pfad: abholbereitBy gesetzt
-        if (o.abholbereitBy) {
+        // 1) Neuer Pfad: v1.20.13 Transport-Move (Inegöl) hat Vorrang, sonst Abholbereit-Move (Wien)
+        if (o.transportBy) {
+            if (o.transportBy !== email) return;
+            logDate = o.transportAt && o.transportAt.toDate ? o.transportAt.toDate()
+                    : (o.transportAt && o.transportAt.seconds ? new Date(o.transportAt.seconds*1000) : null);
+        } else if (o.abholbereitBy) {
             if (o.abholbereitBy !== email) return;
             logDate = o.abholbereitAt && o.abholbereitAt.toDate ? o.abholbereitAt.toDate()
                     : (o.abholbereitAt && o.abholbereitAt.seconds ? new Date(o.abholbereitAt.seconds*1000) : null);
         } else {
-            // 2) Fallback: Log-Text parsen (historische Bestellungen ohne abholbereitBy)
+            // 2) Fallback: Log-Text parsen (historische Bestellungen ohne …By)
             if (!o.log) return;
             const entry = o.log.find(l => {
                 if (!l || !l.text) return false;
-                if (!l.text.includes('nach Abholbereit verschoben')) return false;
+                if (!(l.text.includes('nach Transport verschoben') || l.text.includes('nach Abholbereit verschoben'))) return false;
                 const t = l.text.toLowerCase();
                 return t.startsWith(expectedLogNameLc + ' ')
                     || (memberNameLc && t.startsWith(memberNameLc + ' '));

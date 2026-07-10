@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.12-externe-reparatur';
+const CACHE_NAME = 'fliegengitter-v1.20.14-kombi-doppeltuer';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

@@ -320,8 +320,11 @@ function renderEditMeasures(orderId) {
                 : 'border:1px solid var(--border);background:var(--card)';
             const placeholder = `<option value=""${!currentOpt?' selected':''} disabled>— bitte wählen —</option>`;
             const dropdownOpts = placeholder + optList.map(opt => `<option value="${esc(opt.id)}"${currentOpt===opt.id?' selected':''}>${escHtml(opt.label || opt.name || opt.id)}${inactiveSuffix(opt)}</option>`).join('');
+            // v1.20.14: Türart bei Netz/Plissee-Kombi sperren (Kombi = immer Doppeltür)
+            const lockTuerartKombi = vid === 'tuerart' && m.variants && m.variants.netz_plissee === 'kombi';
+            const vidLocked = isLocked || lockTuerartKombi;
             variantsHtml += `<div class="field"><label>${escHtml(variant.name)}</label>
-                <select onchange="updateEditMeasureVariant(${i},'${esc(vid)}',this.value,'${orderId}')" ${isLocked?'disabled':''} style="font-size:13px;padding:9px 8px;width:100%;${optBorder};border-radius:8px;font-family:inherit;${isLocked?'opacity:0.5':''}">${dropdownOpts}</select></div>`;
+                <select onchange="updateEditMeasureVariant(${i},'${esc(vid)}',this.value,'${orderId}')" ${vidLocked?'disabled':''} style="font-size:13px;padding:9px 8px;width:100%;${optBorder};border-radius:8px;font-family:inherit;${vidLocked?'opacity:0.5':''}">${dropdownOpts}</select></div>`;
 
             // Followup-Flags aus der ECHTEN Option lesen (auch wenn gefiltert/inaktiv)
             const currentOptObj = (variant.options || []).find(opt => opt.id === currentOpt);
@@ -450,6 +453,14 @@ function updateEditMeasureVariant(i, variantId, optionId, orderId) {
             const newPrice = isDt ? mdl.pricing.defaultSqmPriceDoppeltuer : mdl.pricing.defaultSqmPriceEinzeltuer;
             if (newPrice) editMeasures[i].preis = newPrice;
         }
+    }
+    // v1.20.14: Netz/Plissee-Kombi geht nur als Doppeltür → Türart automatisch auf Doppeltür
+    if (variantId === 'netz_plissee' && optionId === 'kombi') {
+        editMeasures[i].doppeltuer = true;
+        editMeasures[i].variants.tuerart = 'doppel';
+        const mdl = (cachedModels || []).find(mm => mm.id === editMeasures[i].modelId);
+        const newPrice = computeSuggestedPrice(mdl, true, 'kombi');
+        if (newPrice) editMeasures[i].preis = newPrice;
     }
     renderEditMeasures(orderId);
 }
@@ -1880,7 +1891,10 @@ function renderNewForm() {
             const currentOpt = savedOptForVid;
 
             // Bei Türart-forcedDoppeltuer: locked, nicht änderbar
-            const isTuerartLocked = vid === 'tuerart' && forceDt !== null;
+            // v1.20.14: Bei Netz/Plissee-Kombi ist Türart fest Doppeltür → ebenfalls sperren
+            const isTuerartKombiLock = vid === 'tuerart' && m.variants.netz_plissee === 'kombi';
+            const isTuerartLocked = (vid === 'tuerart' && forceDt !== null) || isTuerartKombiLock;
+            const tuerartLockHint = isTuerartKombiLock ? '' : '(durch Modell vorgegeben)';
 
             // v1.18.16: ALLES als Dropdown mit "— bitte wählen —" Default.
             // Mitarbeiter MUSS aktiv aus Dropdown wählen.
@@ -1891,7 +1905,7 @@ function renderNewForm() {
             const borderStyle = !currentOpt
                 ? 'border:2px solid var(--amber);background:#fffbeb'  // Warn-Style wenn leer
                 : 'border:1px solid var(--border);background:var(--card)';
-            variantsHtml += `<div class="field" style="margin-top:8px"><label style="display:flex;align-items:center;gap:6px"><span>${escHtml(variant.name)}</span>${isTuerartLocked ? '<span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:normal;font-weight:400">(durch Modell vorgegeben)</span>' : ''}</label>
+            variantsHtml += `<div class="field" style="margin-top:8px"><label style="display:flex;align-items:center;gap:6px"><span>${escHtml(variant.name)}</span>${isTuerartLocked ? `<span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:normal;font-weight:400">${tuerartLockHint}</span>` : ''}</label>
                 <select onchange="updateMeasureVariant(${i},'${esc(vid)}',this.value)" ${isTuerartLocked?'disabled':''} style="font-size:13px;padding:9px 8px;width:100%;${borderStyle};border-radius:8px;font-family:inherit;${isTuerartLocked?'opacity:0.6':''}">${dropdownOpts}</select></div>`;
 
             // v1.19.28: Netz-Folgeauswahl analog Plissee-Folge — wenn aktuelle Option netzFollowup hat
@@ -2170,6 +2184,12 @@ function updateMeasureVariant(i, variantId, optionId) {
     // Spezialfall: Türart synchronisiert mit m.doppeltuer (Code-Stabilität)
     if (variantId === 'tuerart') {
         measureFields[i].doppeltuer = optionId === 'doppel';
+    }
+    // v1.20.14: Netz/Plissee-Kombi geht nur als Doppeltür → Türart automatisch auf
+    // Doppeltür umschalten (auch aus Einzeltür heraus). Kombi + Einzeltür ist unmöglich.
+    if (variantId === 'netz_plissee' && optionId === 'kombi') {
+        measureFields[i].doppeltuer = true;
+        measureFields[i].variants.tuerart = 'doppel';
     }
     // v1.19.27: Preis-Vorschlag aus Matrix bei Türart- oder Netz/Plissee-Wechsel
     if (variantId === 'tuerart' || variantId === 'netz_plissee') {
