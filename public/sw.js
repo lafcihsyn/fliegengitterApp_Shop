@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.14-kombi-doppeltuer';
+const CACHE_NAME = 'fliegengitter-v1.20.15-modellwechsel-varianten-erhalt';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

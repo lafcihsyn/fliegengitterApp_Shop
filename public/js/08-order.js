@@ -472,8 +472,11 @@ async function updateEditMeasureModel(i, newModelId, orderId) {
     if (newModelId === oldModelId) return;
 
     const newModel = newModelId ? getModel(newModelId) : null;
-    const newPrice = newModel && newModel.pricing
-        ? (editMeasures[i].doppeltuer ? newModel.pricing.defaultSqmPriceDoppeltuer : newModel.pricing.defaultSqmPriceEinzeltuer)
+    // v1.20.15: Preis matrix-bewusst berechnen (berücksichtigt Netz/Plissee, Kombi = Plissee-Preis),
+    // damit ein Modell-Wechsel den Kombi-Preis nicht auf den Netz-Standard herunterzieht.
+    const npForPrice = editMeasures[i].variants && editMeasures[i].variants.netz_plissee;
+    const newPrice = newModel
+        ? computeSuggestedPrice(newModel, !!editMeasures[i].doppeltuer, npForPrice)
         : null;
     const oldPrice = editMeasures[i].preis || 0;
 
@@ -504,18 +507,25 @@ async function updateEditMeasureModel(i, newModelId, orderId) {
     }
 
     editMeasures[i].modelId = newModelId;
-    // Alte Varianten zurücksetzen, weil sie zum alten Modell gehörten
-    editMeasures[i].variants = {};
-    // Defaults aus neuem Modell setzen
+    // v1.20.15: Varianten beim Modell-Wechsel NICHT mehr platt zurücksetzen (das wischte z.B.
+    // Kombi + Plissee-Farbe → Bestellung wurde stumm zu "Netz"). Stattdessen die Werte behalten,
+    // die das neue Modell auch kennt; nur fehlende mit dem Default des neuen Modells auffüllen.
+    const oldVariants = editMeasures[i].variants || {};
+    const keptVariants = {};
     if (newModel && Array.isArray(newModel.variantIds)) {
         newModel.variantIds.forEach(vid => {
             const variant = getVariant(vid);
             if (!variant || variant.active === false) return;
-            const def = variant.defaultOption;
-            if (def) editMeasures[i].variants[vid] = def;
+            if (oldVariants[vid] != null && oldVariants[vid] !== '') keptVariants[vid] = oldVariants[vid];
+            else if (variant.defaultOption) keptVariants[vid] = variant.defaultOption;
         });
     }
-    // tuerart aus doppeltuer-Flag synchronisieren
+    // Folge-Farben hängen an netz_plissee (stehen nicht in variantIds) → separat behalten
+    ['netzFarbe', 'plisseeFarbe'].forEach(k => {
+        if (oldVariants[k] != null && oldVariants[k] !== '') keptVariants[k] = oldVariants[k];
+    });
+    editMeasures[i].variants = keptVariants;
+    // tuerart aus doppeltuer-Flag synchronisieren (Modell-Wechsel ändert die Türart nicht)
     editMeasures[i].variants.tuerart = editMeasures[i].doppeltuer ? 'doppel' : 'einzel';
     renderEditMeasures(orderId);
 }
