@@ -1,4 +1,13 @@
-# Sineklik Web-App – Deployment Anleitung
+# BestellApp (fliegengitter-web) — Deploy-Anleitung
+
+> **Interne PWA für Mitarbeiter** (Bella Home): Bestellungen, Produktion, Stammdaten, Etiketten-Druck.
+> 🟢 Live: **https://fliegengitter-3486c.web.app** · nutzt dieselbe Firestore-DB wie der Webshop (`bella_shop`).
+>
+> 📌 **Laufender Projekt-Stand, App-Version (`APP_VERSION` in `public/index.html`) + Änderungshistorie:** siehe **[CLAUDE.md](CLAUDE.md)** (Changelog + Offene TODOs) — das ist die lebende Quelle.
+> **Deploy:** Test-Channel ZUERST → `firebase hosting:channel:deploy test --expires 7d`, dann nach OK live → `firebase deploy --only hosting`. Bei JEDEM Deploy `APP_VERSION` (index.html) **und** `CACHE_NAME` (sw.js) hochzählen, sonst sehen Mitarbeiter die alte gecachte Version.
+
+<details>
+<summary>Ältere generische Einrichtungs-Anleitung (Referenz)</summary>
 
 ## Was ist drin?
 ```
@@ -70,3 +79,5 @@ firebase deploy --only hosting
 - **Kosten**: Spark-Plan (kostenlos) reicht für eure Nutzung.
 - **Daten**: Gleiche Firebase-Datenbank wie die Android-App – 
   alle Bestellungen sind sofort synchron.
+
+</details>
