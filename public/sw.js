@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.16-netzfarben-pro-profil';
+const CACHE_NAME = 'fliegengitter-v1.20.17-profilfarbe-label';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

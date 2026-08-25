@@ -381,7 +381,7 @@ function renderEditMeasures(orderId) {
                     <!-- Farbe + €/m² -->
                     <!-- v1.19.36: dynamische Farbliste aus Stammdaten (vorher hardcodiert auf 3 Farben). -->
                     <div style="display:flex;gap:8px;align-items:flex-end">
-                        <div class="field" style="flex:1"><label>Farbe</label>
+                        <div class="field" style="flex:1"><label>Profilfarbe</label>
                             <select onchange="editMeasures[${i}].farbe=this.value;calcEditPrice('${orderId}')" style="font-size:13px;padding:9px 8px;width:100%">
                                 ${(() => {
                                     // v1.19.49: Modell-Restriktion bleibt; Fallback nutzt zentralen Helper.
@@ -2020,7 +2020,7 @@ function renderNewForm() {
                     <div id="oobHint_${i}">${oobHint}</div>
                     <!-- Zeile 2: Farbe (Color-Chips) + €/m² -->
                     <div style="display:flex;gap:8px;align-items:flex-end">
-                        <div class="field" style="flex:1"><label>Profil-Farbe${!m.farbe ? ' <span style="color:#92400e;font-size:11px;font-weight:700">(bitte wählen)</span>' : ''}</label>
+                        <div class="field" style="flex:1"><label>Profilfarbe${!m.farbe ? ' <span style="color:#92400e;font-size:11px;font-weight:700">(bitte wählen)</span>' : ''}</label>
                             ${colorChipsHtml}
                         </div>
                         <div class="field price-protected" style="width:75px;flex-shrink:0"><label>€/m²</label><input type="number" value="${currentPrice}" step="0.5" oninput="updateMeasure(${i},'preis',this.value)"></div>
