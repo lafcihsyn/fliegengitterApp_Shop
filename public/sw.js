@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.15-modellwechsel-varianten-erhalt';
+const CACHE_NAME = 'fliegengitter-v1.20.16-netzfarben-pro-profil';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

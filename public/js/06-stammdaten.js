@@ -931,7 +931,7 @@ function openModelForm(id) {
         sections: [{ id: 'default', name: '', materials: [] }],
         conditionalMaterials: [],
         pricing: { minSqmPriceEinzeltuer: 0, minSqmPriceDoppeltuer: 0, defaultSqmPriceEinzeltuer: 25, defaultSqmPriceDoppeltuer: 60 },
-        colors: [], defaultColor: '',
+        colors: [], defaultColor: '', netzColors: [],
         measureLimits: { minBreite: 30, maxBreite: 250, minHoehe: 50, maxHoehe: 280 },
         graphic: { type: 'rectangle_with_arrows', arrowsFromVariant: '' }
     };
@@ -954,6 +954,14 @@ function openModelForm(id) {
     const defaultColorOptions = cachedColors.filter(c => c.active !== false).map(c =>
         `<option value="${c.id}" ${m.defaultColor===c.id?'selected':''}>${escHtml(c.name)}</option>`
     ).join('');
+
+    // Erlaubte Netzfarben pro Profil (leer = ALLE erlaubt). Spiegelt die Profil-Farbauswahl.
+    const netzColorsHtml = (cachedNetzColors || []).filter(c => c.active !== false).map(c => `
+        <label class="checkbox-label" style="padding:4px 0;margin-bottom:0">
+            <input type="checkbox" class="model-netzcolor-cb" value="${c.id}" ${(m.netzColors||[]).includes(c.id)?'checked':''}>
+            <span style="display:inline-flex;padding:2px 10px;border-radius:6px;background:${c.bg};color:${c.text};font-size:12px;font-weight:600">${escHtml(c.name)}</span>
+        </label>
+    `).join('') || '<div style="font-size:12px;color:var(--text-muted);padding:8px">Erst Netzfarben anlegen.</div>';
 
     const overlay = document.createElement('div');
     overlay.className = 'edit-overlay';
@@ -1032,6 +1040,12 @@ function openModelForm(id) {
                     <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Welche Farben kann der Mitarbeiter bei diesem Modell wählen?</div>
                     <div id="modelColorsBlock">${colorsHtml}</div>
                     ${defaultColorOptions ? `<label style="display:block;margin-top:8px;font-size:12px">Default-Farbe: <select class="em-input" id="modelDefaultColor"><option value="">— keine —</option>${defaultColorOptions}</select></label>` : ''}
+                </div>
+
+                <div class="edit-field">
+                    <label>Erlaubte Netzfarben (Fliegengitter)</label>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Welche Netzfarben sind bei diesem Profil wählbar? <strong>Nichts angehakt = alle erlaubt.</strong></div>
+                    <div id="modelNetzColorsBlock">${netzColorsHtml}</div>
                 </div>
 
                 <div class="edit-field"><label>Maß-Grenzen (cm)</label>
@@ -1554,6 +1568,7 @@ async function saveModel(id) {
     const variantIds = Array.from(document.querySelectorAll('.model-variant-cb:checked')).map(cb => cb.value);
     const colors = Array.from(document.querySelectorAll('.model-color-cb:checked')).map(cb => cb.value);
     const defaultColor = document.getElementById('modelDefaultColor')?.value || '';
+    const netzColors = Array.from(document.querySelectorAll('.model-netzcolor-cb:checked')).map(cb => cb.value);
 
     const pricing = {
         defaultSqmPriceEinzeltuer: parseFloat(document.getElementById('priceDefaultE').value) || 0,
@@ -1650,7 +1665,7 @@ async function saveModel(id) {
     const data = {
         name, description, color, active,
         default: isDefault,
-        forcedDoppeltuer, variantIds, pricing, colors, defaultColor, measureLimits,
+        forcedDoppeltuer, variantIds, pricing, colors, defaultColor, netzColors, measureLimits,
         sections,
         conditionalMaterials: existing?.conditionalMaterials || [],
         graphic: existing?.graphic || { type: 'rectangle_with_arrows', arrowsFromVariant: variantIds[0] || '' },

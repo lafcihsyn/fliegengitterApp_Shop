@@ -330,7 +330,9 @@ function renderEditMeasures(orderId) {
             const currentOptObj = (variant.options || []).find(opt => opt.id === currentOpt);
             // v1.19.28: Netz-Folgeauswahl analog Plissee
             if (currentOptObj && currentOptObj.netzFollowup) {
-                const activeNetzColors = (cachedNetzColors || []).filter(c => c.active !== false);
+                // Nur die für dieses Profil erlaubten Netzfarben (leer = alle erlaubt).
+                const _allowedNetz = (currentModel && Array.isArray(currentModel.netzColors) && currentModel.netzColors.length) ? currentModel.netzColors : null;
+                const activeNetzColors = (cachedNetzColors || []).filter(c => c.active !== false && (!_allowedNetz || _allowedNetz.includes(c.id)));
                 const currentNC = m.variants && m.variants.netzFarbe;
                 const netzList = withSavedItem(activeNetzColors, cachedNetzColors, currentNC, 'id', m.netzFarbeName);
                 if (netzList.length || currentNC) {
@@ -1921,7 +1923,9 @@ function renderNewForm() {
             // v1.19.28: Netz-Folgeauswahl analog Plissee-Folge — wenn aktuelle Option netzFollowup hat
             const currentOptObj = (variant.options || []).find(o => o.id === currentOpt);
             if (currentOptObj && currentOptObj.netzFollowup) {
-                const activeNetzColors = (cachedNetzColors || []).filter(c => c.active !== false);
+                // Nur die für dieses Profil erlaubten Netzfarben (leer = alle erlaubt).
+                const _allowedNetz = (currentModel && Array.isArray(currentModel.netzColors) && currentModel.netzColors.length) ? currentModel.netzColors : null;
+                const activeNetzColors = (cachedNetzColors || []).filter(c => c.active !== false && (!_allowedNetz || _allowedNetz.includes(c.id)));
                 const currentNetzColor = m.variants.netzFarbe || '';
                 // v1.19.58: gespeicherten Wert erhalten (KEIN Auto-Clear, Prinzip 3)
                 const netzList = withSavedItem(activeNetzColors, cachedNetzColors, currentNetzColor, 'id', m.netzFarbeName);
