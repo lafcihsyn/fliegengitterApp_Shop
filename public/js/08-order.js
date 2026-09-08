@@ -1330,7 +1330,7 @@ async function saveAsDraft() {
             const variants = Object.assign({}, m.variants || {});
             variants.tuerart = m.doppeltuer ? 'doppel' : 'einzel';
             measureObj.variants = variants;
-            measureObj.bemerkung = '';
+            measureObj.bemerkung = m.bemerkung || '';
             measureObj.materialColors = {};
         }
         attachMeasureNames(measureObj); // v1.19.59: Namen mitspeichern
@@ -2673,7 +2673,7 @@ async function saveNewOrder() {
             const variants = Object.assign({}, m.variants || {});
             variants.tuerart = m.doppeltuer ? 'doppel' : 'einzel';
             measureObj.variants = variants;
-            measureObj.bemerkung = '';
+            measureObj.bemerkung = m.bemerkung || '';
             measureObj.materialColors = {};
         }
         attachMeasureNames(measureObj); // v1.19.59: Namen mitspeichern

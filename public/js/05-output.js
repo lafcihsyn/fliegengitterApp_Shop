@@ -841,9 +841,13 @@ function exportOrderPDF(id) {
             variantHints.push(label);
         });
         const variantStr = variantHints.length ? `<div style="font-size:11px;color:#534AB7;margin-top:2px;font-weight:600">${variantHints.map(escHtml).join(' · ')}</div>` : '';
+        // Maß-Bemerkung (falls vorhanden) — hervorgehoben, damit sie in der Produktion nicht übersehen wird.
+        const bemerkStr = (m.bemerkung && String(m.bemerkung).trim())
+            ? `<div style="font-size:11px;color:#92400e;background:#fef3c7;border-radius:5px;padding:2px 6px;margin-top:3px;font-weight:600;display:inline-block">Bemerkung: ${escHtml(String(m.bemerkung).trim())}</div>`
+            : '';
         return `<tr>
             <td style="padding:10px 12px;border-bottom:1px solid #eee">${i + 1}</td>
-            <td style="padding:10px 12px;border-bottom:1px solid #eee">${artikelHtml}${variantStr}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #eee">${artikelHtml}${variantStr}${bemerkStr}</td>
             <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:center">${m.breite} × ${m.hoehe} cm${m.doppeltuer ? ' DT' : ''}</td>
             <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:center">${m.stueck || 1}</td>
             <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right">${sqm.toFixed(2)} m²</td>

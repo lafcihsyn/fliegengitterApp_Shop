@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.17-profilfarbe-label';
+const CACHE_NAME = 'fliegengitter-v1.20.18-massbemerkung-fix';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
