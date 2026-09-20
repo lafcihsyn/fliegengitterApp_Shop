@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fliegengitter-v1.20.18-massbemerkung-fix';
+const CACHE_NAME = 'fliegengitter-v1.20.19-bodenprofil-warnung';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

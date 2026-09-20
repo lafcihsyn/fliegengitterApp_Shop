@@ -38,6 +38,28 @@
             display: inline-flex; align-items: center; justify-content: center;
             vertical-align: middle;
         }
+        /* ── Bodenprofil-Warnung in der Schnittliste ──
+           Roter Rahmen + sanft gleitende Farbe auf den betroffenen Zeilen
+           (Rahmen-Breite + Bodenprofil), NUR wenn Bodenprofil aktiv ist —
+           verhindert, dass das Bodenprofil übersehen und die Breite 2× geschnitten wird. */
+        @keyframes bpShimmer {
+            0%   { background-position: 0% 50%; }
+            100% { background-position: -200% 50%; }
+        }
+        tr.bp-warn > td {
+            background-image: linear-gradient(90deg, #fee2e2 0%, #fca5a5 25%, #fee2e2 50%, #fca5a5 75%, #fee2e2 100%);
+            background-size: 200% 100%;
+            animation: bpShimmer 3s linear infinite;
+            border-top: 2px solid #dc2626 !important;
+            border-bottom: 2px solid #dc2626 !important;
+        }
+        tr.bp-warn > td:first-child { border-left: 2px solid #dc2626 !important; font-weight: 700; color: #991b1b; }
+        tr.bp-warn > td:last-child  { border-right: 2px solid #dc2626 !important; }
+        /* Stück-Zahl (4. Spalte) hervorheben — die entscheidende Anzahl (z.B. 1× statt 2×) */
+        tr.bp-warn > td:nth-child(4) { font-size: 18px; font-weight: 800; color: #991b1b; }
+        @media (prefers-reduced-motion: reduce) {
+            tr.bp-warn > td { animation: none; background-image: none; background-color: #fee2e2; }
+        }
     </style>
 </head>
 <body>
@@ -1312,7 +1334,7 @@ let drafts = [];
 let editMeasures = [];
 let summarySlides = [];
 let currentSlide = 0;
-const APP_VERSION = '1.20.18';
+const APP_VERSION = '1.20.19';
 const MAX_MASS_CM = 600; // Maximale Breite/Höhe in cm – Schutz vor Tippfehlern
 let unsubOrders = null;
 let sqmPrice = 25;
@@ -3230,9 +3252,13 @@ function renderTable() {
             }
         }
 
+        // Bodenprofil aktiv? → betroffene Zeilen (Rahmen-Breite + Bodenprofil) rot markieren,
+        // damit das Bodenprofil nicht übersehen und die Breite nicht 2× geschnitten wird.
+        const hasBodenprofil = !!(measureVariants && (measureVariants.schwellenlos === 'ja' || measureVariants.bodenprofil === 'ja'));
         modelMaterials.forEach(mm => {
             const matInfo = cachedMaterials.find(cm => cm.id === mm.materialId);
             if (!matInfo || matInfo.active === false) return;
+            const isBodenprofilMat = /bodenprofil/i.test(matInfo.name || '');
             // Filter ET/DT (am Material, wie heute)
             if (isDoppeltuer && matInfo.nurEinzeltuer) return;
             if (!isDoppeltuer && matInfo.nurDoppeltuer) return;
@@ -3315,7 +3341,9 @@ function renderTable() {
                     // Hinweis-Marker wenn Override aktiv
                     const hasActiveOverride = (cut.overrides || []).some(ov => cutConditionMatches(ov.when, measureVariants));
                     const overrideMarker = hasActiveOverride ? ' <span style="font-size:9px;color:var(--amber);font-weight:700" title="Override aktiv">⚡</span>' : '';
-                    html += `<tr><td>${escHtml(translateMaterial(cut.label))}${overrideMarker}</td><td><span class="bestell-val">${basis.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${eff.abzug}</td><td>${stueckDisplay}</td><td><span class="mass-value">${mass.toFixed(1)}</span></td></tr>`;
+                    // Bodenprofil-Warnung: Rahmen-Breite (mit aktivem Bodenprofil-Override) + das Bodenprofil-Material rot markieren.
+                    const bpWarnRow = hasBodenprofil && (isBodenprofilMat || (cut.basis === 'breite' && hasActiveOverride));
+                    html += `<tr${bpWarnRow ? ' class="bp-warn"' : ''}><td>${escHtml(translateMaterial(cut.label))}${overrideMarker}</td><td><span class="bestell-val">${basis.toFixed(1)}</span></td><td style="text-align:center;font-size:12px;color:var(--text-muted)">−${eff.abzug}</td><td>${stueckDisplay}</td><td><span class="mass-value">${mass.toFixed(1)}</span></td></tr>`;
                 });
             }
         });
